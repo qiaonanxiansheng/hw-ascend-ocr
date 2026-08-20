@@ -1,163 +1,162 @@
-# ascend-ocr configuration file
-# All configurable parameters for the OCR pipeline.
+# ascend-ocr 配置文件
+# OCR 流水线的所有可配置参数
 
-# ======================== Model Paths ========================
-# Models are organized by chip type under models/ directory.
-# Structure: models/{chip}/{det,rec,cls}.om
+# ======================== 模型路径 ========================
+# 模型按芯片类型存放在 models/ 目录下
+# 目录结构: models/{芯片型号}/{det,rec,cls}.om
 chip: "310"
 
-# Or specify model paths directly (overrides chip-based paths):
+# 也可以直接指定模型路径（会覆盖上面基于芯片的路径）:
 # det_model: "models/310/det.om"
 # rec_model: "models/310/rec.om"
 # cls_model: "models/310/cls.om"
 
-# Character dictionary for recognition (leave empty to use bundled default).
+# 识别字典路径（留空则使用内置默认字典）
 rec_char_dict: ""
 
-# NPU device id.
+# NPU 设备 ID
 device_id: 0
 
-# Whether to run angle classification (0/90/180/270).
-# Disable if input images are already upright.
+# 是否进行角度分类（0/90/180/270度）
+# 如果输入图片已经是正向的，可以关闭
 use_angle_cls: true
 
-# Enable debug visualizations.
+# 是否启用调试可视化
 debug: false
 
-# ======================== Detection ========================
+# ======================== 文字检测 ========================
 det:
-  # Maximum side length of resized image. Larger = better accuracy, slower.
+  # 缩放后图片的最大边长。值越大精度越高，速度越慢
   limit_side_len: 960
 
-  # Multiple to which height/width are rounded (model requirement).
+  # 高度和宽度需要对齐的倍数（模型要求）
   limit_multiple: 32
 
-  # Fixed input size (H, W) for static-shape models. Auto-detected from model.
+  # 静态模型的固定输入尺寸 (高, 宽)，从模型自动检测
   # fixed_input_size: null
 
-  # Resize strategy: "pad" | "stretch" | "crop_center"
-  #   pad         - keep aspect ratio, pad with pad_color (best accuracy)
-  #   stretch     - stretch to exact target size (fastest, may distort)
-  #   crop_center - center crop to target size
+  # 缩放策略: "pad" | "stretch" | "crop_center"
+  #   pad         - 保持宽高比，用 pad_color 填充（精度最高）
+  #   stretch     - 拉伸到目标尺寸（速度最快，可能变形）
+  #   crop_center - 居中裁剪到目标尺寸
   resize_mode: "pad"
 
-  # Padding color [B, G, R] when resize_mode == "pad".
+  # 填充颜色 [B, G, R]，当 resize_mode == "pad" 时使用
   pad_color: [0, 0, 0]
 
-  # Normalization: "imagenet" | "ppocr" | "none" | "custom"
+  # 归一化方式: "imagenet" | "ppocr" | "none" | "custom"
   #   imagenet - mean=[0.485,0.456,0.406], std=[0.229,0.224,0.225], scale=1/255
   #   ppocr    - mean=[0.5,0.5,0.5],      std=[0.5,0.5,0.5],      scale=1/255
-  #   none     - only divide by 255
-  #   custom   - use the mean/std/scale fields below
+  #   none     - 仅除以 255
+  #   custom   - 使用下面的 mean/std/scale 字段
   normalize_mode: "imagenet"
 
-  # Custom normalization (used when normalize_mode == "custom").
+  # 自定义归一化参数（当 normalize_mode == "custom" 时使用）
   mean: [0.485, 0.456, 0.406]
   std: [0.229, 0.224, 0.225]
   scale: 0.00392156862745098  # 1/255
 
-  # ---- DBNet Post-processing ----
+  # ---- DBNet 后处理 ----
 
-  # Binarization threshold for probability map.
+  # 概率图二值化阈值
   thresh: 0.3
 
-  # Minimum mean probability inside a candidate box to keep it.
+  # 候选框内最小平均概率，低于此值的框会被过滤
   box_thresh: 0.6
 
-  # Polygon expansion ratio. 1.0 = no expansion, 1.5~2.0 = standard DB unclip.
+  # 多边形扩展比例。1.0 = 不扩展，1.5~2.0 = 标准 DB unclip
   unclip_ratio: 1.6
 
-  # Minimum / maximum box area (in original image pixels) to keep.
+  # 框面积的最小/最大值（原图像素），超出范围的框会被过滤
   min_box_area: 10.0
   max_box_area: .inf
 
-  # Minimum / maximum aspect ratio (w/h) of a box to keep.
+  # 框宽高比（宽/高）的最小/最大值
   min_aspect_ratio: 0.05
   max_aspect_ratio: 50.0
 
-  # Maximum number of detected boxes.
+  # 最大检测框数量
   max_candidates: 1000
 
-  # Box representation: "minarearect" | "poly" | "quad"
-  #   minarearect - 4-point minimum-area rectangle (recommended)
-  #   poly        - raw approximated polygon (more points, slower)
-  #   quad        - same as minarearect but explicitly 4-point
+  # 框的表示方式: "minarearect" | "poly" | "quad"
+  #   minarearect - 4点最小外接矩形（推荐用于识别）
+  #   poly        - 原始近似多边形（点数更多，较慢）
+  #   quad        - 与 minarearect 相同，但显式返回 4 个点
   box_type: "minarearect"
 
-  # Use pyclipper for accurate polygon un-clipping. Falls back if unavailable.
+  # 使用 pyclipper 进行精确多边形扩展，不可用时自动回退
   use_pyclipper: true
 
-  # Dilate binary map before finding contours. Connects broken strokes, may merge close boxes.
+  # 在查找轮廓前对二值图进行膨胀，可连接断裂笔画，但可能合并相邻框
   use_dilate: false
   dilate_kernel_size: 2
 
-  # NMS threshold between candidate boxes. <0 disables NMS.
+  # 候选框之间的 NMS 阈值，<0 表示不使用 NMS
   nms_threshold: -1.0
 
-  # Reading-order sorting: "natural" | "top2bottom" | "left2right"
-  #   natural    - group boxes into text lines then sort (default)
-  #   top2bottom - strict top-to-bottom, then left-to-right
-  #   left2right - strict left-to-right, then top-to-bottom
+  # 阅读顺序排序: "natural" | "top2bottom" | "left2right"
+  #   natural    - 将框分组为文本行后排序（默认）
+  #   top2bottom - 严格从上到下，再从左到右
+  #   left2right - 严格从左到右，再从上到下
   sort_mode: "natural"
 
-  # Controls how aggressively boxes are grouped into text lines.
-  # Smaller = more lines, larger = fewer lines. Only used with sort_mode == "natural".
+  # 控制框分组为文本行的紧密程度，仅在 sort_mode == "natural" 时生效
+  # 值越小分行越多，值越大分行越少
   line_cluster_factor: 0.5
 
-# ======================== Recognition ========================
+# ======================== 文字识别 ========================
 rec:
-  # Fixed input shape (C, H, W). Auto-detected from static models.
+  # 固定输入形状 (C, H, W)，静态模型会自动检测
   rec_image_shape: [3, 48, 320]
 
-  # Maximum width; longer images are down-scaled, shorter are padded.
+  # 最大宽度，超出的图片会被压缩，不足的会填充
   max_text_width: 320
 
-  # Minimum width in pixels to guarantee enough CTC time steps.
+  # 最小宽度（像素），保证有足够的 CTC 时间步
   min_text_width: 96
 
-  # Resize strategy: "fixed_height_pad" | "fixed_size_stretch" | "fixed_height_stretch"
-  #   fixed_height_pad     - fixed height, pad to target width (preserves aspect)
-  #   fixed_size_stretch   - stretch to exact rec_image_shape (fastest)
-  #   fixed_height_stretch - fixed height, stretch width to target (may distort)
+  # 缩放策略: "fixed_height_pad" | "fixed_size_stretch" | "fixed_height_stretch"
+  #   fixed_height_pad     - 固定高度，填充到目标宽度（保持宽高比）
+  #   fixed_size_stretch   - 拉伸到 rec_image_shape（速度最快）
+  #   fixed_height_stretch - 固定高度，拉伸宽度到目标值（可能变形）
   resize_mode: "fixed_height_pad"
 
-  # Padding alignment: "left" | "center" | "right"
-  #   left   - text at left edge, pad right (PP-OCR convention)
-  #   center - center text, pad both sides
-  #   right  - text at right edge, pad left
+  # 填充对齐方式: "left" | "center" | "right"
+  #   left   - 文字靠左，右边填充（PP-OCR 训练约定）
+  #   center - 文字居中，两边填充
+  #   right  - 文字靠右，左边填充
   pad_align: "left"
 
-  # Normalization: "imagenet" | "ppocr" | "none" | "custom"
+  # 归一化方式: "imagenet" | "ppocr" | "none" | "custom"
   normalize_mode: "ppocr"
 
-  # Custom normalization (used when normalize_mode == "custom").
+  # 自定义归一化参数
   mean: [0.5, 0.5, 0.5]
   std: [0.5, 0.5, 0.5]
   scale: 0.00392156862745098  # 1/255
 
-  # CTC blank index. 0 = first class (PP-OCR convention). -1 = last class.
+  # CTC 空白索引。0 = 第一个类别（PP-OCR 约定），-1 = 最后一个类别
   blank_index: 0
 
-  # Batch size for recognition. Dynamic-shape models always infer one-by-one.
+  # 识别批处理大小，动态形状模型始终逐个推理
   batch_size: 8
 
-  # 180-degree flip correction when confidence is low. Runs image twice.
+  # 置信度低时是否尝试 180 度翻转校正（会运行两次推理）
   use_direction_ensemble: false
   direction_ensemble_thresh: 0.6
 
-# ======================== Classification ========================
+# ======================== 角度分类 ========================
 cls:
-  # Input size (C, H, W).
+  # 输入尺寸 (C, H, W)
   cls_image_shape: [3, 224, 224]
 
-  # Class index -> rotation angle (degrees, counter-clockwise).
-  # Order must match model output order.
+  # 类别索引 -> 旋转角度（度，逆时针），顺序必须与模型输出一致
   label_list: [0, 180, 270, 90]
 
-  # Normalization: "imagenet" | "ppocr" | "none" | "custom"
+  # 归一化方式: "imagenet" | "ppocr" | "none" | "custom"
   normalize_mode: "ppocr"
 
-  # Custom normalization.
+  # 自定义归一化参数
   mean: [0.5, 0.5, 0.5]
   std: [0.5, 0.5, 0.5]
   scale: 0.00392156862745098  # 1/255

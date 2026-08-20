@@ -142,8 +142,8 @@ class AscendOCR:
         if self.config.use_angle_cls:
             cls = self.classifier
             if cls is not None:
-                img, angle = cls.rotate_to_upright(img)
-                logger.info("[角度分类] 检测角度: %d°, 已旋转校正", angle)
+                img, angle, cls_conf = cls.rotate_to_upright(img)
+                logger.info("[角度分类] 角度: %d°, 置信度: %.3f", angle, cls_conf)
             else:
                 logger.info("[角度分类] 分类器未加载，跳过")
         else:
@@ -156,7 +156,10 @@ class AscendOCR:
             if return_visualization:
                 return [], img
             return []
-        logger.info("[文字检测] 检测到 %d 个文字区域", len(boxes))
+        logger.info("[文字检测] 检测到 %d 个文字区域:", len(boxes))
+        for idx, box in enumerate(boxes, 1):
+            pts = box.reshape(-1, 2).astype(int).tolist()
+            logger.info("  %2d. 坐标: %s", idx, pts)
 
         # 3. Crop and rectify text lines.
         crops = self.detector.crop_text_lines(img, boxes)
@@ -173,7 +176,7 @@ class AscendOCR:
 
         logger.info("[文字识别] 识别结果:")
         for idx, r in enumerate(results, 1):
-            logger.info("  %2d. [%.3f] %s", idx, r.score, r.text)
+            logger.info("  %2d. 置信度: %.3f, 文字: %s", idx, r.score, r.text)
         logger.info("=== OCR 完成，共 %d 行文字 ===", len(results))
 
         if return_visualization:

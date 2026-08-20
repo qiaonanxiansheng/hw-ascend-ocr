@@ -175,6 +175,13 @@ class AscendOCR:
         orig_img = load_image(image)
         orig_h, orig_w = orig_img.shape[:2]
         logger.info("OCR 开始, 输入图片: %s", orig_img.shape)
+
+        # 预加载模型（懒加载），不计入 OCR 耗时
+        _ = self.detector
+        _ = self.recognizer
+        if self.config.use_angle_cls:
+            _ = self.classifier
+
         t_total = time.perf_counter()
 
         # 1. Large-angle classification and rotation.

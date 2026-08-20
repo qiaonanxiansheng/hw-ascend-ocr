@@ -36,24 +36,21 @@ def _unclip(points: np.ndarray, unclip_ratio: float, use_pyclipper: bool = True)
         try:
             import pyclipper
 
-            scaling = 1.0
-            subject = [(p[0] * scaling, p[1] * scaling) for p in points]
+            subject = [(float(p[0]), float(p[1])) for p in points]
             clipper = pyclipper.PyclipperOffset()
             clipper.AddPath(subject, pyclipper.JT_ROUND, pyclipper.ET_CLOSEDPOLYGON)
-            expanded = clipper.Execute(distance * scaling)
+            expanded = clipper.Execute(distance)
             if not expanded:
                 return points.reshape(-1, 1, 2)
-            expanded = np.array(expanded[0], dtype=np.float32) / scaling
+            expanded = np.array(expanded[0], dtype=np.float32)
             return expanded.reshape(-1, 1, 2)
         except Exception:
             pass
 
     # Fallback approximation.
-    offset = np.ones(points.shape, dtype=np.float32) * distance
-    expanded = points + offset
-    expanded_center = expanded.mean(axis=0)
-    original_center = points.mean(axis=0)
-    expanded = expanded - expanded_center + original_center
+    expanded = points + distance
+    expanded -= expanded.mean(axis=0)
+    expanded += points.mean(axis=0)
     return expanded.reshape(-1, 1, 2)
 
 
@@ -66,44 +63,49 @@ def _box_score_fast(bitmap: np.ndarray, box: np.ndarray) -> float:
     if xmax <= xmin or ymax <= ymin:
         return 0.0
     mask = np.zeros((ymax - ymin + 1, xmax - xmin + 1), dtype=np.uint8)
-    shifted_box = box - np.array([xmin, ymin])
-    cv2.fillPoly(mask, [shifted_box.reshape(-1, 1, 2)], 1)
-    roi = bitmap[ymin : ymax + 1, xmin : xmax + 1]
-    return float(roi[mask.astype(bool)].mean())
-
-
-def _box_iou(box1: np.ndarray, box2: np.ndarray) -> float:
-    """IoU between two rotated rectangles approximated by their bounding boxes."""
-    p1 = box1.reshape(-1, 2)
-    p2 = box2.reshape(-1, 2)
-    x1_min, y1_min = p1.min(axis=0)
-    x1_max, y1_max = p1.max(axis=0)
-    x2_min, y2_min = p2.min(axis=0)
-    x2_max, y2_max = p2.max(axis=0)
-
-    inter_w = max(0, min(x1_max, x2_max) - max(x1_min, x2_min))
-    inter_h = max(0, min(y1_max, y2_max) - max(y1_min, y2_min))
-    inter = inter_w * inter_h
-
-    area1 = (x1_max - x1_min) * (y1_max - y1_min)
-    area2 = (x2_max - x2_min) * (y2_max - y2_min)
-    union = area1 + area2 - inter
-    return inter / union if union > 0 else 0.0
+    shifted_box = box.reshape(-1, 1, 2)
+    shifted_box[:, :, 0] -= int(xmin)
+    shifted_box[:, :, 1] -= int(ymin)
+    cv2.fillPoly(mask, [shifted_box], 1)
+    roi = bitmap[int(ymin):int(ymax) + 1, int(xmin):int(xmax) + 1]
+    # mask 本身是 uint8(0/1)，numpy 可直接作为布尔索引，无需 .astype(bool)
+    return float(roi[mask].mean())
 
 
 def _nms(boxes: List[np.ndarray], threshold: float) -> List[np.ndarray]:
-    """Simple NMS based on bounding-box IoU."""
+    """Vectorized NMS based on bounding-box IoU."""
     if threshold < 0 or len(boxes) <= 1:
         return boxes
-    keep = [True] * len(boxes)
-    for i in range(len(boxes)):
+    n = len(boxes)
+    # 一次性提取所有框的外接矩形
+    bboxes = np.empty((n, 4), dtype=np.float32)
+    for i, box in enumerate(boxes):
+        pts = box.reshape(-1, 2)
+        bboxes[i, 0] = pts[:, 0].min()
+        bboxes[i, 1] = pts[:, 1].min()
+        bboxes[i, 2] = pts[:, 0].max()
+        bboxes[i, 3] = pts[:, 1].max()
+
+    areas = (bboxes[:, 2] - bboxes[:, 0]) * (bboxes[:, 3] - bboxes[:, 1])
+    keep = [True] * n
+    for i in range(n):
         if not keep[i]:
             continue
-        for j in range(i + 1, len(boxes)):
-            if not keep[j]:
-                continue
-            if _box_iou(boxes[i], boxes[j]) > threshold:
-                keep[j] = False
+        # 计算 box[i] 与所有后续框的 IoU
+        j_start = i + 1
+        xx1 = np.maximum(bboxes[i, 0], bboxes[j_start:, 0])
+        yy1 = np.maximum(bboxes[i, 1], bboxes[j_start:, 1])
+        xx2 = np.minimum(bboxes[i, 2], bboxes[j_start:, 2])
+        yy2 = np.minimum(bboxes[i, 3], bboxes[j_start:, 3])
+        inter_w = np.clip(xx2 - xx1, 0, None)
+        inter_h = np.clip(yy2 - yy1, 0, None)
+        inter = inter_w * inter_h
+        union = areas[i] + areas[j_start:] - inter
+        iou = np.where(union > 0, inter / union, 0.0)
+        # 抑制 IoU > threshold 的框
+        suppressed = np.where(iou > threshold)[0] + j_start
+        for j in suppressed:
+            keep[j] = False
     return [boxes[i] for i, k in enumerate(keep) if k]
 
 
@@ -204,6 +206,8 @@ def postprocess_detection(
     boxes = []
     src_h, src_w = src_shape
     pred_h, pred_w = pred.shape[:2]
+    # 预计算缩放因子，避免在循环中重复创建
+    scale_arr = np.array([src_w / pred_w, src_h / pred_h], dtype=np.float32)
 
     for contour in contours[: cfg.max_candidates]:
         if contour.size < 8:
@@ -226,17 +230,13 @@ def postprocess_detection(
         # Convert to requested box type.
         box = _to_box(box, cfg.box_type)
 
-        # Scale back to original image coordinates.
-        scaled_box = box.copy()
-        scaled_box[:, 0] = box[:, 0] * (src_w / pred_w)
-        scaled_box[:, 1] = box[:, 1] * (src_h / pred_h)
+        # Scale back to original image coordinates (单次矩阵乘法，无需 copy).
+        scaled_box = box * scale_arr
+        np.clip(scaled_box[:, 0], 0, src_w - 1, out=scaled_box[:, 0])
+        np.clip(scaled_box[:, 1], 0, src_h - 1, out=scaled_box[:, 1])
 
-        # Clip to image bounds.
-        scaled_box[:, 0] = np.clip(scaled_box[:, 0], 0, src_w - 1)
-        scaled_box[:, 1] = np.clip(scaled_box[:, 1], 0, src_h - 1)
-
-        # Area filter.
-        area = cv2.contourArea(scaled_box.astype(np.float32))
+        # Area filter (已经是 float32，无需重复转换).
+        area = cv2.contourArea(scaled_box)
         if area < cfg.min_box_area or area > cfg.max_box_area:
             continue
 

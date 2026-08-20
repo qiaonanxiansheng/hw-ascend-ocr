@@ -3,6 +3,7 @@ High-level OCR engine that orchestrates classification, detection and recognitio
 """
 
 import logging
+import time
 from dataclasses import dataclass
 from typing import Callable, List, Optional, Union
 
@@ -36,25 +37,23 @@ def _rotate_boxes_back(boxes: List[np.ndarray], angle: int, orig_h: int, orig_w:
 
     rotated = []
     for box in boxes:
-        pts = box.reshape(-1, 2).copy()
+        pts = box.reshape(-1, 2)
         if angle == 90:
-            # 逆时针90°的逆变换: (x', y') -> (orig_w - 1 - y', x')
             new_x = orig_w - 1 - pts[:, 1]
             new_y = pts[:, 0]
         elif angle == 180:
-            # 180°的逆变换: (x', y') -> (orig_w - 1 - x', orig_h - 1 - y')
             new_x = orig_w - 1 - pts[:, 0]
             new_y = orig_h - 1 - pts[:, 1]
         elif angle == 270:
-            # 逆时针270°的逆变换: (x', y') -> (y', orig_h - 1 - x')
             new_x = pts[:, 1]
             new_y = orig_h - 1 - pts[:, 0]
         else:
             rotated.append(box)
             continue
-        pts[:, 0] = new_x
-        pts[:, 1] = new_y
-        rotated.append(pts)
+        new_pts = pts.copy()
+        new_pts[:, 0] = new_x
+        new_pts[:, 1] = new_y
+        rotated.append(new_pts)
     return rotated
 
 
@@ -176,6 +175,7 @@ class AscendOCR:
         orig_img = load_image(image)
         orig_h, orig_w = orig_img.shape[:2]
         logger.info("OCR 开始, 输入图片: %s", orig_img.shape)
+        t_total = time.perf_counter()
 
         # 1. Large-angle classification and rotation.
         angle = 0
@@ -183,32 +183,41 @@ class AscendOCR:
         if self.config.use_angle_cls:
             cls = self.classifier
             if cls is not None:
+                t0 = time.perf_counter()
                 img, angle, cls_conf = cls.rotate_to_upright(img)
-                logger.debug("[角度分类] 角度: %d°, 置信度: %.3f", angle, cls_conf)
+                t_cls = time.perf_counter() - t0
+                logger.info("[角度分类] 角度: %d°, 置信度: %.3f, 耗时: %.1fms", angle, cls_conf, t_cls * 1000)
             else:
                 logger.debug("[角度分类] 分类器未加载，跳过")
         else:
             logger.debug("[角度分类] 已禁用，跳过")
 
         # 2. Text detection (on rotated image).
+        t0 = time.perf_counter()
         boxes = self.detector.detect(img)
+        t_det = time.perf_counter() - t0
         if not boxes:
-            logger.info("OCR 完成, 未检测到文字")
+            logger.info("[文字检测] 未检测到文字, 耗时: %.1fms", t_det * 1000)
             if return_visualization:
                 return [], orig_img
             return []
-        logger.debug("[文字检测] 检测到 %d 个文字区域（旋转后坐标）:", len(boxes))
+        logger.info("[文字检测] 检测到 %d 个文字区域, 耗时: %.1fms", len(boxes), t_det * 1000)
         for idx, box in enumerate(boxes, 1):
             pts = box.reshape(-1, 2).astype(int).tolist()
             logger.debug("  %2d. 坐标: %s", idx, pts)
 
         # 3. Crop and rectify text lines (from rotated image).
+        t0 = time.perf_counter()
         crops = self.detector.crop_text_lines(img, boxes)
         images = [crop for crop, _ in crops]
         boxes = [box for _, box in crops]
+        t_crop = time.perf_counter() - t0
+        logger.debug("[文字裁剪] 裁剪 %d 个文本行, 耗时: %.1fms", len(images), t_crop * 1000)
 
         # 4. Text recognition.
+        t0 = time.perf_counter()
         rec_results = self.recognizer.recognize_batch(images)
+        t_rec = time.perf_counter() - t0
 
         # 5. 将检测框坐标映射回原图坐标系。
         orig_boxes = _rotate_boxes_back(boxes, angle, orig_h, orig_w)
@@ -218,10 +227,11 @@ class AscendOCR:
             for box, (text, score) in zip(orig_boxes, rec_results)
         ]
 
-        logger.debug("[文字识别] 识别结果:")
+        logger.info("[文字识别] 识别 %d 行, 耗时: %.1fms", len(results), t_rec * 1000)
         for idx, r in enumerate(results, 1):
             logger.debug("  %2d. 置信度: %.3f, 文字: %s", idx, r.score, r.text)
-        logger.info("OCR 完成, 共 %d 行文字", len(results))
+        t_total = time.perf_counter() - t_total
+        logger.info("OCR 完成, 共 %d 行文字, 总耗时: %.1fms", len(results), t_total * 1000)
 
         if return_visualization:
             vis = draw_boxes(

@@ -89,20 +89,24 @@ class CTCDecoder:
 
         blank = self.blank_index if self.blank_index >= 0 else len(self.char_list) - 1
 
-        # Merge repeats and remove blanks.
+        # 预过滤：用 numpy 找出非空白、非重复的位置，减少 Python 循环次数
+        not_blank = indices != blank
+        not_repeat = np.empty(len(indices), dtype=bool)
+        not_repeat[0] = True
+        not_repeat[1:] = indices[1:] != indices[:-1]
+        valid = not_blank & not_repeat
+        valid_indices = indices[valid]
+        valid_confs = confidences[valid]
+
+        # 构建文本（仍需 Python 循环查 char_list）
+        char_list = self.char_list
+        n_chars = len(char_list)
         text_chars = []
         confs = []
-        prev_idx = -1
-        for idx, conf in zip(indices, confidences):
-            if idx == blank:
-                prev_idx = idx
-                continue
-            if idx == prev_idx:
-                continue
-            if 0 <= idx < len(self.char_list):
-                text_chars.append(self.char_list[idx])
-                confs.append(float(conf))
-            prev_idx = idx
+        for idx, conf in zip(valid_indices, valid_confs):
+            if 0 <= idx < n_chars:
+                text_chars.append(char_list[idx])
+                confs.append(conf)
 
         text = "".join(text_chars)
         mean_conf = float(np.mean(confs)) if confs else 0.0

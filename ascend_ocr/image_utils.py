@@ -119,15 +119,21 @@ def order_points(pts: np.ndarray) -> np.ndarray:
     Returns:
         Ordered array of shape (4, 2).
     """
-    pts = pts.reshape(4, 2).astype(np.float32)
+    pts = pts.reshape(4, 2)
+    if pts.dtype != np.float32:
+        pts = pts.astype(np.float32)
     s = pts.sum(axis=1)
-    diff = np.diff(pts, axis=1)
-    rect = np.zeros((4, 2), dtype=np.float32)
-    rect[0] = pts[np.argmin(s)]   # top-left
-    rect[2] = pts[np.argmax(s)]   # bottom-right
+    diff = np.diff(pts, axis=1).ravel()
+    rect = np.empty((4, 2), dtype=np.float32)
+    rect[0] = pts[np.argmin(s)]     # top-left
+    rect[2] = pts[np.argmax(s)]     # bottom-right
     rect[1] = pts[np.argmin(diff)]  # top-right
     rect[3] = pts[np.argmax(diff)]  # bottom-left
     return rect
+
+
+# 缓存 dst 数组，避免每次调用 perspective_transform 时重复分配
+_dst_cache: dict = {}
 
 
 def perspective_transform(
@@ -148,18 +154,17 @@ def perspective_transform(
         raise PreprocessError(" perspective_transform needs at least 4 points")
 
     src = order_points(pts[:4])
-    dst = np.array(
-        [
-            [0, 0],
-            [target_size[0] - 1, 0],
-            [target_size[0] - 1, target_size[1] - 1],
-            [0, target_size[1] - 1],
-        ],
-        dtype=np.float32,
-    )
+    # 从缓存获取 dst 数组，避免重复分配
+    dst = _dst_cache.get(target_size)
+    if dst is None:
+        tw, th = target_size
+        dst = np.array(
+            [[0, 0], [tw - 1, 0], [tw - 1, th - 1], [0, th - 1]],
+            dtype=np.float32,
+        )
+        _dst_cache[target_size] = dst
     M = cv2.getPerspectiveTransform(src, dst)
-    warped = cv2.warpPerspective(img, M, target_size)
-    return warped
+    return cv2.warpPerspective(img, M, target_size)
 
 
 def resize_with_aspect_ratio(
@@ -217,15 +222,20 @@ def normalize_image(
     Returns:
         Normalized float32 array with shape (3, H, W).
     """
-    if img.dtype != np.float32:
-        img = img.astype(np.float32)
-    img = img * scale
+    img = img.astype(np.float32)
     if mean and std:
-        mean = np.array(mean, dtype=np.float32).reshape(1, 1, 3)
-        std = np.array(std, dtype=np.float32).reshape(1, 1, 3)
-        img = (img - mean) / std
-    img = np.transpose(img, (2, 0, 1))
-    return img
+        # 融合运算: (img * scale - mean) / std = img * (scale/std) + (-mean/std)
+        # 减少到一次乘法和一次加法，比原始的 3 次数组操作少 2 次
+        inv_std = np.array(std, dtype=np.float32).reshape(1, 1, 3)
+        np.divide(scale, inv_std, out=inv_std)
+        bias = np.array(mean, dtype=np.float32).reshape(1, 1, 3)
+        np.negative(bias, out=bias)
+        np.divide(bias, np.array(std, dtype=np.float32).reshape(1, 1, 3), out=bias)
+        img *= inv_std
+        img += bias
+    else:
+        img *= scale
+    return np.ascontiguousarray(np.transpose(img, (2, 0, 1)))
 
 
 def draw_boxes(

@@ -106,7 +106,7 @@ def preprocess_for_detection(
 
     scale, mean, std = _get_norm_params(cfg)
     tensor = normalize_image(resized, scale=scale, mean=mean, std=std)
-    tensor = np.expand_dims(tensor, axis=0).astype(np.float32)
+    tensor = np.expand_dims(tensor, axis=0)
     return tensor, (scale_h, scale_w), (resize_h, resize_w)
 
 
@@ -125,7 +125,7 @@ def preprocess_for_classification(img: np.ndarray, cfg: ClsConfig) -> np.ndarray
     resized = cv2.resize(img, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
     scale, mean, std = _get_norm_params(cfg)
     tensor = normalize_image(resized, scale=scale, mean=mean, std=std)
-    return np.expand_dims(tensor, axis=0).astype(np.float32)
+    return np.expand_dims(tensor, axis=0)
 
 
 def preprocess_for_recognition(
@@ -188,7 +188,7 @@ def preprocess_for_recognition(
 
     scale, mean, std = _get_norm_params(cfg)
     tensor = normalize_image(resized, scale=scale, mean=mean, std=std)
-    tensor = np.expand_dims(tensor, axis=0).astype(np.float32)
+    tensor = np.expand_dims(tensor, axis=0)
     logger.debug(
         "Rec preprocess: crop %dx%d -> tensor %s (mode=%s)",
         w, h, tensor.shape, cfg.resize_mode,

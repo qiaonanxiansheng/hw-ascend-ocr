@@ -1,6 +1,7 @@
 """Text recognition: wraps the recognition OM model and CTC decoder."""
 
 import logging
+import time
 from typing import Callable, List, Optional, Tuple
 
 import numpy as np
@@ -18,7 +19,6 @@ def _to_probs(arr: np.ndarray) -> np.ndarray:
     """Return per-class probabilities, skipping softmax if the model output
     is already normalized (some OM models embed a Softmax layer)."""
     if arr.min() >= 0.0 and np.allclose(arr.sum(axis=-1), 1.0, atol=1e-2):
-        logger.debug("Rec output already normalized; skipping softmax")
         return arr
     return softmax(arr, axis=-1)
 
@@ -86,16 +86,19 @@ class TextRecognizer:
                     return flipped_text, flipped_conf
         return result
 
+    def _log_rec_result(self, idx: int, text: str, conf: float, elapsed_ms: float) -> None:
+        """Debug-level per-line recognition log."""
+        logger.debug(
+            "  %2d. 置信度: %.3f, 耗时: %.1fms, 文字: %s",
+            idx, conf, elapsed_ms, text,
+        )
+
     def _infer_one(self, img: np.ndarray) -> Tuple[str, float]:
         tensor, _ = preprocess_for_recognition(img, self.cfg)
         outputs = self.model.infer([tensor])
         logits = outputs[0]
         probs = _to_probs(logits)
         text, conf = self.decoder.decode(probs)
-        logger.debug(
-            "Rec: crop %dx%d -> output %s, text=%r conf=%.4f",
-            img.shape[1], img.shape[0], list(logits.shape), text, conf,
-        )
         return text, conf
 
     def recognize_batch(
@@ -108,16 +111,32 @@ class TextRecognizer:
         text-line widths vary. Static-shape models are padded and batched.
         """
         if self.model.dynamic_input or self.cfg.batch_size <= 1:
-            return [self.recognize(img) for img in images]
+            results = []
+            for i, img in enumerate(images):
+                t0 = time.perf_counter()
+                text, conf = self.recognize(img)
+                elapsed_ms = (time.perf_counter() - t0) * 1000
+                self._log_rec_result(i + 1, text, conf, elapsed_ms)
+                results.append((text, conf))
+            return results
 
         results = []
         batch_size = max(1, self.cfg.batch_size)
         for i in range(0, len(images), batch_size):
             batch = images[i : i + batch_size]
             if len(batch) == 1:
-                results.append(self.recognize(batch[0]))
+                t0 = time.perf_counter()
+                text, conf = self.recognize(batch[0])
+                elapsed_ms = (time.perf_counter() - t0) * 1000
+                self._log_rec_result(i + 1, text, conf, elapsed_ms)
+                results.append((text, conf))
             else:
-                results.extend(self._recognize_static_batch(batch))
+                t0 = time.perf_counter()
+                batch_results = self._recognize_static_batch(batch)
+                elapsed_ms = (time.perf_counter() - t0) * 1000
+                for j, (text, conf) in enumerate(batch_results):
+                    self._log_rec_result(i + j + 1, text, conf, elapsed_ms / len(batch))
+                results.extend(batch_results)
         return results
 
     def _recognize_static_batch(

@@ -1,6 +1,8 @@
 """Text detection: wraps the detection OM model and DBNet post-processing."""
 
 import logging
+import math
+import time
 from typing import Callable, List, Optional, Tuple
 
 import cv2
@@ -77,15 +79,22 @@ class TextDetector:
             List of (text_line_image, box) tuples.
         """
         crops = []
-        for box in boxes:
-            pts = box.reshape(-1, 2).astype(np.float32)
+        for i, box in enumerate(boxes):
+            t0 = time.perf_counter()
+            pts = box.reshape(-1, 2)
+            if pts.dtype != np.float32:
+                pts = pts.astype(np.float32)
             if pts.shape[0] != 4:
                 rect = cv2.minAreaRect(pts)
                 pts = cv2.boxPoints(rect)
 
-            # Compute target size from the two adjacent edges.
-            edge1 = np.linalg.norm(pts[1] - pts[0])
-            edge2 = np.linalg.norm(pts[2] - pts[1])
+            # 用 math.hypot 替代 np.linalg.norm，减少 numpy 开销
+            dx01 = float(pts[1, 0] - pts[0, 0])
+            dy01 = float(pts[1, 1] - pts[0, 1])
+            dx12 = float(pts[2, 0] - pts[1, 0])
+            dy12 = float(pts[2, 1] - pts[1, 1])
+            edge1 = math.hypot(dx01, dy01)
+            edge2 = math.hypot(dx12, dy12)
             target_w = max(int(edge1), 1)
             target_h = max(int(edge2), 1)
             if edge2 > edge1:
@@ -96,6 +105,11 @@ class TextDetector:
                 target_w, target_h = target_h, target_w
 
             warped = perspective_transform(img, pts, (target_w, target_h))
+            elapsed_ms = (time.perf_counter() - t0) * 1000
+            logger.debug(
+                "  裁剪 %2d: %dx%d, 耗时: %.1fms",
+                i + 1, target_w, target_h, elapsed_ms,
+            )
             crops.append((warped, pts))
         return crops
 

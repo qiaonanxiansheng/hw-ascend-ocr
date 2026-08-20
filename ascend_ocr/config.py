@@ -252,11 +252,14 @@ def load_config(yaml_path: str, models_root: str = "models") -> OCRConfig:
     rec_model = data.get("rec_model")
     cls_model = data.get("cls_model")
 
-    if chip and not det_model and not rec_model:
+    if chip:
         chip_dir = os.path.join(models_root, chip)
-        det_model = os.path.join(chip_dir, "det.om")
-        rec_model = os.path.join(chip_dir, "rec.om")
-        cls_model = os.path.join(chip_dir, "cls.om")
+        if not det_model:
+            det_model = os.path.join(chip_dir, "det.om")
+        if not rec_model:
+            rec_model = os.path.join(chip_dir, "rec.om")
+        if not cls_model:
+            cls_model = os.path.join(chip_dir, "cls.om")
 
     # Apply top-level fields
     if det_model:

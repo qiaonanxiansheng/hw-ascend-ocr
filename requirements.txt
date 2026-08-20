@@ -1,4 +1,5 @@
 numpy>=1.21.0
 opencv-python>=4.5.0
 pyclipper>=1.2.0
+pyyaml>=6.0
 # acl is provided by the Ascend CANN toolkit at runtime; do not install via pip.

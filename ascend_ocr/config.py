@@ -2,7 +2,9 @@
 
 import os
 from dataclasses import dataclass, field
-from typing import Callable, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+import yaml
 
 
 def default_char_dict_path() -> str:
@@ -199,3 +201,77 @@ class OCRConfig:
 
     # Whether to return debug visualizations.
     debug: bool = False
+
+
+def _apply_dict(obj: Any, data: Dict[str, Any]) -> None:
+    """Apply a dict to a dataclass instance, skipping None values."""
+    for key, value in data.items():
+        if value is None:
+            continue
+        if not hasattr(obj, key):
+            raise ValueError(f"Unknown config key: {key}")
+        setattr(obj, key, value)
+
+
+def load_config(yaml_path: str, models_root: str = "models") -> OCRConfig:
+    """
+    Load OCRConfig from a YAML file.
+
+    Args:
+        yaml_path: Path to the YAML configuration file.
+        models_root: Root directory for models (default: "models").
+
+    Returns:
+        OCRConfig instance.
+
+    Raises:
+        FileNotFoundError: If yaml_path does not exist.
+        ValueError: If YAML contains unknown config keys.
+    """
+    with open(yaml_path, "r", encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+
+    # Build sub-configs
+    det = DetConfig()
+    rec = RecConfig()
+    cls = ClsConfig()
+
+    if "det" in data and data["det"]:
+        _apply_dict(det, data["det"])
+    if "rec" in data and data["rec"]:
+        _apply_dict(rec, data["rec"])
+    if "cls" in data and data["cls"]:
+        _apply_dict(cls, data["cls"])
+
+    # Build top-level config
+    cfg = OCRConfig(det=det, rec=rec, cls=cls)
+
+    # Handle chip-based model paths
+    chip = data.get("chip")
+    det_model = data.get("det_model")
+    rec_model = data.get("rec_model")
+    cls_model = data.get("cls_model")
+
+    if chip and not det_model and not rec_model:
+        chip_dir = os.path.join(models_root, chip)
+        det_model = os.path.join(chip_dir, "det.om")
+        rec_model = os.path.join(chip_dir, "rec.om")
+        cls_model = os.path.join(chip_dir, "cls.om")
+
+    # Apply top-level fields
+    if det_model:
+        cfg.det_model = det_model
+    if rec_model:
+        cfg.rec_model = rec_model
+    if cls_model:
+        cfg.cls_model = cls_model
+    if "rec_char_dict" in data and data["rec_char_dict"]:
+        cfg.rec_char_dict = data["rec_char_dict"]
+    if "device_id" in data and data["device_id"] is not None:
+        cfg.device_id = data["device_id"]
+    if "use_angle_cls" in data and data["use_angle_cls"] is not None:
+        cfg.use_angle_cls = data["use_angle_cls"]
+    if "debug" in data and data["debug"] is not None:
+        cfg.debug = data["debug"]
+
+    return cfg

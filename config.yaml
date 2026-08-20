@@ -18,8 +18,8 @@ rec_char_dict: ""
 device_id: 0
 
 # 是否进行角度分类（0/90/180/270度）
-# 如果输入图片已经是正向的，可以关闭
-use_angle_cls: true
+# 如果输入图片已经是正向的，或没有分类模型，可以关闭
+use_angle_cls: false
 
 # 是否启用调试可视化
 debug: false
@@ -49,7 +49,7 @@ det:
   #   ppocr    - mean=[0.5,0.5,0.5],      std=[0.5,0.5,0.5],      scale=1/255
   #   none     - 仅除以 255
   #   custom   - 使用下面的 mean/std/scale 字段
-  normalize_mode: "imagenet"
+  normalize_mode: "custom"
 
   # 自定义归一化参数（当 normalize_mode == "custom" 时使用）
   mean: [0.485, 0.456, 0.406]

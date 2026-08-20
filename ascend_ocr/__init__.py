@@ -31,7 +31,7 @@ from .angle_classifier import AngleClassifier
 from .text_detector import TextDetector
 from .text_recognizer import TextRecognizer
 from .model import AscendModel
-from .config import OCRConfig, DetConfig, RecConfig, ClsConfig
+from .config import OCRConfig, DetConfig, RecConfig, ClsConfig, load_config
 
 __version__ = "3.0.0"
 __all__ = [
@@ -45,4 +45,5 @@ __all__ = [
     "DetConfig",
     "RecConfig",
     "ClsConfig",
+    "load_config",
 ]

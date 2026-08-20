@@ -66,7 +66,9 @@ def main():
     print(f"检测到 {len(results)} 行文字")
     print(f"{'='*50}")
     for idx, r in enumerate(results, 1):
+        pts = r.box.reshape(-1, 2).astype(int).tolist()
         print(f"{idx:2d}. [{r.score:.3f}] {r.text}")
+        print(f"     坐标: {pts}")
 
     engine.release()
 

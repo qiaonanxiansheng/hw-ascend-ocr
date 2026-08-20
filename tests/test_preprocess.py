@@ -2,8 +2,8 @@
 
 import numpy as np
 
-from yuntu_ascend_ocr.config import ClsConfig, DetConfig, RecConfig
-from yuntu_ascend_ocr.preprocess import (
+from ascend_ocr.config import ClsConfig, DetConfig, RecConfig
+from ascend_ocr.preprocess import (
     preprocess_for_classification,
     preprocess_for_detection,
     preprocess_for_recognition,

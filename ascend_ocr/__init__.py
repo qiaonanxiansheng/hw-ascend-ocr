@@ -1,6 +1,6 @@
 """
-yuntu_ascend_ocr
-================
+ascend_ocr
+==========
 
 A native, high-cohesion OCR engine for Huawei Ascend (NPU).
 
@@ -14,7 +14,7 @@ Pipeline:
 
 Example
 -------
->>> from yuntu_ascend_ocr import AscendOCR
+>>> from ascend_ocr import AscendOCR
 >>> engine = AscendOCR(
 ...     det_model="models/ppocrv5_server_det_Ascend910B3.om",
 ...     rec_model="models/ppocrv5_rec_Ascend910B3.om",

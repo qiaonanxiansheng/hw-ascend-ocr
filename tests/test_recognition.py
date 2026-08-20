@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from yuntu_ascend_ocr.recognition import CTCDecoder
+from ascend_ocr.recognition import CTCDecoder
 
 
 def test_ctc_decode_simple():

@@ -2,8 +2,8 @@
 
 import numpy as np
 
-from yuntu_ascend_ocr.config import DetConfig
-from yuntu_ascend_ocr.postprocess import postprocess_detection
+from ascend_ocr.config import DetConfig
+from ascend_ocr.postprocess import postprocess_detection
 
 
 def _make_hotspot(pred_h=64, pred_w=64):

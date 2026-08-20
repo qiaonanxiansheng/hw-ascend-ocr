@@ -1,4 +1,4 @@
-# yuntu-ascend-ocr
+# ascend-ocr
 
 A native, high-cohesion OCR engine for Huawei Ascend (NPU).
 
@@ -23,9 +23,9 @@ Ascend CANN at runtime and should not be installed via pip.
 ## Quick Start
 
 ```python
-from yuntu_ascend_ocr import AscendOCR
+from ascend_ocr import AscendOCR
 
-from yuntu_ascend_ocr.config import default_char_dict_path
+from ascend_ocr.config import default_char_dict_path
 
 engine = AscendOCR(
     det_model="models/ppocrv5_server_det_Ascend910B3.om",
@@ -59,8 +59,8 @@ You can fine-tune behavior with `OCRConfig`. All pre/post-processing algorithms
 are exposed as switches so you can prioritize accuracy or speed:
 
 ```python
-from yuntu_ascend_ocr import AscendOCR
-from yuntu_ascend_ocr.config import (
+from ascend_ocr import AscendOCR
+from ascend_ocr.config import (
     OCRConfig, DetConfig, RecConfig, ClsConfig, default_char_dict_path
 )
 
@@ -125,7 +125,7 @@ python examples/ocr_example.py \
 ## Project Structure
 
 ```
-yuntu_ascend_ocr/
+ascend_ocr/
 ├── __init__.py          # Public API
 ├── ocr.py               # AscendOCR orchestrator
 ├── model.py             # AscendCL model wrapper
@@ -154,4 +154,4 @@ yuntu_ascend_ocr/
 
 - `acl.init()` / `acl.finalize()` are managed once per process via `acl_env.py`.
 - Multiple `AscendOCR` / `AscendModel` instances can share the same ACL context.
-- Replace the bundled character dictionary (`yuntu_ascend_ocr/configs/ppocr_keys_v1.txt`) with the dictionary that matches your recognition model.
+- Replace the bundled character dictionary (`ascend_ocr/configs/ppocr_keys_v1.txt`) with the dictionary that matches your recognition model.

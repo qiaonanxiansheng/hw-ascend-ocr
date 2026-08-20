@@ -1,4 +1,4 @@
-"""Setup script for yuntu-ascend-ocr."""
+"""Setup script for ascend-ocr."""
 
 from setuptools import find_packages, setup
 
@@ -6,7 +6,7 @@ with open("README.md", "r", encoding="utf-8") as f:
     long_description = f.read()
 
 setup(
-    name="yuntu-ascend-ocr",
+    name="ascend-ocr",
     version="3.0.0",
     author="Yuntu AI",
     author_email="",
@@ -16,7 +16,7 @@ setup(
     url="",
     packages=find_packages(exclude=["tests", "examples", "ascend"]),
     package_data={
-        "yuntu_ascend_ocr": ["configs/*"],
+        "ascend_ocr": ["configs/*"],
     },
     include_package_data=True,
     python_requires=">=3.8",

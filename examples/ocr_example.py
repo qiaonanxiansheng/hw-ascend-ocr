@@ -8,8 +8,8 @@ import sys
 
 sys.path.insert(0, "..")
 
-from yuntu_ascend_ocr import AscendOCR
-from yuntu_ascend_ocr.config import default_char_dict_path
+from ascend_ocr import AscendOCR
+from ascend_ocr.config import default_char_dict_path
 
 
 def main():
@@ -59,7 +59,7 @@ def main():
 
         import cv2
 
-        from yuntu_ascend_ocr.image_utils import load_image
+        from ascend_ocr.image_utils import load_image
 
         os.makedirs(args.save_crops, exist_ok=True)
         src = load_image(args.image)

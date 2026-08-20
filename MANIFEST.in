@@ -1,4 +1,4 @@
 include README.md
 include requirements.txt
-recursive-include yuntu_ascend_ocr/configs *.txt
+recursive-include ascend_ocr/configs *.txt
 recursive-include examples *.py

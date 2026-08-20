@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from yuntu_ascend_ocr.image_utils import (
+from ascend_ocr.image_utils import (
     load_image,
     order_points,
     perspective_transform,

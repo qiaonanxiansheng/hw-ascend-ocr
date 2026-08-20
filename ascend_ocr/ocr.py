@@ -18,6 +18,46 @@ from .text_recognizer import TextRecognizer
 logger = logging.getLogger(__name__)
 
 
+def _rotate_boxes_back(boxes: List[np.ndarray], angle: int, orig_h: int, orig_w: int) -> List[np.ndarray]:
+    """
+    将旋转后图像的检测框坐标映射回原图坐标系。
+
+    Args:
+        boxes: 旋转后图像中的检测框列表，每个 shape (4, 2)
+        angle: 图像被旋转的角度（逆时针，即 rotate_image 的参数）
+        orig_h: 原图高度
+        orig_w: 原图宽度
+
+    Returns:
+        映射回原图坐标系的检测框列表
+    """
+    if angle == 0 or not boxes:
+        return boxes
+
+    rotated = []
+    for box in boxes:
+        pts = box.reshape(-1, 2).copy()
+        if angle == 90:
+            # 逆时针90°的逆变换: (x', y') -> (orig_w - 1 - y', x')
+            new_x = orig_w - 1 - pts[:, 1]
+            new_y = pts[:, 0]
+        elif angle == 180:
+            # 180°的逆变换: (x', y') -> (orig_w - 1 - x', orig_h - 1 - y')
+            new_x = orig_w - 1 - pts[:, 0]
+            new_y = orig_h - 1 - pts[:, 1]
+        elif angle == 270:
+            # 逆时针270°的逆变换: (x', y') -> (y', orig_h - 1 - x')
+            new_x = pts[:, 1]
+            new_y = orig_h - 1 - pts[:, 0]
+        else:
+            rotated.append(box)
+            continue
+        pts[:, 0] = new_x
+        pts[:, 1] = new_y
+        rotated.append(pts)
+    return rotated
+
+
 @dataclass
 class OCRResult:
     """Result of OCR for a single text box."""
@@ -133,11 +173,13 @@ class AscendOCR:
             If ``return_visualization`` is False: list of ``OCRResult``.
             If True: ``(list_of_OCRResult, visualization_image)``.
         """
-        img = load_image(image)
-        logger.info("OCR 开始, 输入图片: %s", img.shape)
+        orig_img = load_image(image)
+        orig_h, orig_w = orig_img.shape[:2]
+        logger.info("OCR 开始, 输入图片: %s", orig_img.shape)
 
         # 1. Large-angle classification and rotation.
         angle = 0
+        img = orig_img
         if self.config.use_angle_cls:
             cls = self.classifier
             if cls is not None:
@@ -148,19 +190,19 @@ class AscendOCR:
         else:
             logger.debug("[角度分类] 已禁用，跳过")
 
-        # 2. Text detection.
+        # 2. Text detection (on rotated image).
         boxes = self.detector.detect(img)
         if not boxes:
             logger.info("OCR 完成, 未检测到文字")
             if return_visualization:
-                return [], img
+                return [], orig_img
             return []
-        logger.debug("[文字检测] 检测到 %d 个文字区域:", len(boxes))
+        logger.debug("[文字检测] 检测到 %d 个文字区域（旋转后坐标）:", len(boxes))
         for idx, box in enumerate(boxes, 1):
             pts = box.reshape(-1, 2).astype(int).tolist()
             logger.debug("  %2d. 坐标: %s", idx, pts)
 
-        # 3. Crop and rectify text lines.
+        # 3. Crop and rectify text lines (from rotated image).
         crops = self.detector.crop_text_lines(img, boxes)
         images = [crop for crop, _ in crops]
         boxes = [box for _, box in crops]
@@ -168,9 +210,12 @@ class AscendOCR:
         # 4. Text recognition.
         rec_results = self.recognizer.recognize_batch(images)
 
+        # 5. 将检测框坐标映射回原图坐标系。
+        orig_boxes = _rotate_boxes_back(boxes, angle, orig_h, orig_w)
+
         results = [
             OCRResult(box=box, text=text, score=score)
-            for box, (text, score) in zip(boxes, rec_results)
+            for box, (text, score) in zip(orig_boxes, rec_results)
         ]
 
         logger.debug("[文字识别] 识别结果:")
@@ -180,7 +225,7 @@ class AscendOCR:
 
         if return_visualization:
             vis = draw_boxes(
-                img,
+                orig_img,
                 [r.box for r in results],
                 texts=[r.text for r in results],
             )

@@ -134,8 +134,7 @@ class AscendOCR:
             If True: ``(list_of_OCRResult, visualization_image)``.
         """
         img = load_image(image)
-        logger.info("=== OCR 开始 ===")
-        logger.info("输入图片: %s", img.shape)
+        logger.info("OCR 开始, 输入图片: %s", img.shape)
 
         # 1. Large-angle classification and rotation.
         angle = 0
@@ -143,23 +142,23 @@ class AscendOCR:
             cls = self.classifier
             if cls is not None:
                 img, angle, cls_conf = cls.rotate_to_upright(img)
-                logger.info("[角度分类] 角度: %d°, 置信度: %.3f", angle, cls_conf)
+                logger.debug("[角度分类] 角度: %d°, 置信度: %.3f", angle, cls_conf)
             else:
-                logger.info("[角度分类] 分类器未加载，跳过")
+                logger.debug("[角度分类] 分类器未加载，跳过")
         else:
-            logger.info("[角度分类] 已禁用，跳过")
+            logger.debug("[角度分类] 已禁用，跳过")
 
         # 2. Text detection.
         boxes = self.detector.detect(img)
         if not boxes:
-            logger.info("[文字检测] 未检测到文字区域")
+            logger.info("OCR 完成, 未检测到文字")
             if return_visualization:
                 return [], img
             return []
-        logger.info("[文字检测] 检测到 %d 个文字区域:", len(boxes))
+        logger.debug("[文字检测] 检测到 %d 个文字区域:", len(boxes))
         for idx, box in enumerate(boxes, 1):
             pts = box.reshape(-1, 2).astype(int).tolist()
-            logger.info("  %2d. 坐标: %s", idx, pts)
+            logger.debug("  %2d. 坐标: %s", idx, pts)
 
         # 3. Crop and rectify text lines.
         crops = self.detector.crop_text_lines(img, boxes)
@@ -174,10 +173,10 @@ class AscendOCR:
             for box, (text, score) in zip(boxes, rec_results)
         ]
 
-        logger.info("[文字识别] 识别结果:")
+        logger.debug("[文字识别] 识别结果:")
         for idx, r in enumerate(results, 1):
-            logger.info("  %2d. 置信度: %.3f, 文字: %s", idx, r.score, r.text)
-        logger.info("=== OCR 完成，共 %d 行文字 ===", len(results))
+            logger.debug("  %2d. 置信度: %.3f, 文字: %s", idx, r.score, r.text)
+        logger.info("OCR 完成, 共 %d 行文字", len(results))
 
         if return_visualization:
             vis = draw_boxes(

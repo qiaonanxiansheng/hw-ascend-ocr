@@ -44,7 +44,7 @@ class TextRecognizer:
                 batch, _, mh, mw = (int(s) for s in shape)
                 cur = self.cfg.rec_image_shape
                 if (cur[1], cur[2]) != (mh, mw):
-                    logger.info(
+                    logger.debug(
                         "Static rec model, input shape %s: overriding "
                         "rec_image_shape (%d,%d,%d) -> (3,%d,%d)",
                         list(shape), cur[0], cur[1], cur[2], mh, mw,
@@ -52,7 +52,7 @@ class TextRecognizer:
                     self.cfg.rec_image_shape = (3, mh, mw)
                     self.cfg.max_text_width = mw
                 if batch == 1 and self.cfg.batch_size != 1:
-                    logger.info(
+                    logger.debug(
                         "Static rec model with batch=1: disabling batching"
                     )
                     self.cfg.batch_size = 1

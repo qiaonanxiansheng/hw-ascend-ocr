@@ -147,11 +147,24 @@ def _order_boxes(
 
 
 def _to_box(points: np.ndarray, box_type: str) -> np.ndarray:
-    """Convert a polygon to the requested box representation."""
+    """Convert a polygon to the requested box representation.
+
+    For minarearect/quad, returns 4 points in clockwise order:
+    top-left, top-right, bottom-right, bottom-left.
+    """
     pts = points.reshape(-1, 2).astype(np.float32)
     if box_type in ("minarearect", "quad"):
         rect = cv2.minAreaRect(pts)
-        return cv2.boxPoints(rect)
+        box = cv2.boxPoints(rect)
+        # Reorder to clockwise: TL, TR, BR, BL.
+        s = box.sum(axis=1)
+        diff = np.diff(box, axis=1).ravel()
+        ordered = np.zeros((4, 2), dtype=np.float32)
+        ordered[0] = box[np.argmin(s)]    # top-left (smallest x+y)
+        ordered[2] = box[np.argmax(s)]    # bottom-right (largest x+y)
+        ordered[1] = box[np.argmin(diff)] # top-right (smallest x-y)
+        ordered[3] = box[np.argmax(diff)] # bottom-left (largest x-y)
+        return ordered
     return pts  # "poly"
 
 

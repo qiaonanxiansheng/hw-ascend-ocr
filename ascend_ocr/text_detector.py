@@ -33,7 +33,7 @@ class TextDetector:
             shape = self.model.get_input_shape(0)
             if len(shape) == 4 and self.cfg.fixed_input_size is None:
                 self.cfg.fixed_input_size = (int(shape[2]), int(shape[3]))
-                logger.info(
+                logger.debug(
                     "Static det model, input shape %s: using fixed input size %dx%d",
                     list(shape), shape[3], shape[2],
                 )
@@ -59,7 +59,7 @@ class TextDetector:
             scale=scale,
             cfg=self.cfg,
         )
-        logger.info("Detected %d text boxes", len(boxes))
+        logger.debug("Detected %d text boxes", len(boxes))
         return boxes
 
     def crop_text_lines(

@@ -9,7 +9,7 @@ chip: "310"
 # 也可以直接指定模型路径（会覆盖上面基于芯片的路径）:
 # det_model: "models/310/det.om"
 # rec_model: "models/310/rec.om"
-# cls_model: "models/310/cls.om"
+cls_model: "models/310/rotate.om"
 
 # 识别字典路径（留空则使用内置默认字典）
 rec_char_dict: ""
@@ -19,7 +19,7 @@ device_id: 0
 
 # 是否进行角度分类（0/90/180/270度）
 # 如果输入图片已经是正向的，或没有分类模型，可以关闭
-use_angle_cls: false
+use_angle_cls: true
 
 # 是否启用调试可视化
 debug: false

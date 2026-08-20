@@ -13,7 +13,7 @@ import os
 
 from ascend_ocr import AscendOCR, load_config
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+logging.basicConfig(format="%(levelname)s %(name)s: %(message)s")
 
 
 def main():
@@ -49,6 +49,10 @@ def main():
         cfg.cls_model = args.cls
     if args.device is not None:
         cfg.device_id = args.device
+
+    # 根据 debug 配置设置日志级别
+    log_level = logging.DEBUG if cfg.debug else logging.INFO
+    logging.getLogger().setLevel(log_level)
 
     print(f"检测模型: {cfg.det_model}")
     print(f"识别模型: {cfg.rec_model}")

@@ -45,18 +45,41 @@ engine.release()
 
 ## Model Files
 
-Place the converted `.om` models under `models/`:
+Models are organized by chip type under `models/` directory:
 
-| Model | Purpose | Typical name |
-|-------|---------|--------------|
-| Detection | Locate text boxes | `ppocrv5_server_det_Ascend910B3.om` |
-| Recognition | Recognize text in each box | `ppocrv5_rec_Ascend910B3.om` |
-| Classification | Large-angle classification [0,180,270,90] | `angle_cls_Ascend910B3.om` |
+```
+models/
+├── 310/
+│   ├── det.om
+│   ├── rec.om
+│   └── cls.om
+├── 310P/
+│   ├── det.om
+│   ├── rec.om
+│   └── cls.om
+└── 910B3/
+    ├── det.om
+    ├── rec.om
+    └── cls.om
+```
+
+| Model | Purpose |
+|-------|---------|
+| det.om | Text detection (DBNet) |
+| rec.om | Text recognition (SVTR + CTC) |
+| cls.om | Angle classification (optional) |
 
 ## Configuration
 
-You can fine-tune behavior with `OCRConfig`. All pre/post-processing algorithms
-are exposed as switches so you can prioritize accuracy or speed:
+All parameters can be set in `config.yaml`:
+
+```yaml
+chip: "310"           # Chip type, used to locate models/{chip}/
+device_id: 0
+use_angle_cls: true
+```
+
+Or programmatically with `OCRConfig`:
 
 ```python
 from ascend_ocr import AscendOCR
@@ -65,9 +88,9 @@ from ascend_ocr.config import (
 )
 
 cfg = OCRConfig(
-    det_model="models/det.om",
-    rec_model="models/rec.om",
-    cls_model="models/cls.om",
+    det_model="models/310/det.om",
+    rec_model="models/310/rec.om",
+    cls_model="models/310/cls.om",
     rec_char_dict=default_char_dict_path(),
     det=DetConfig(
         limit_side_len=1280,
@@ -77,22 +100,24 @@ cfg = OCRConfig(
         box_thresh=0.6,
         unclip_ratio=1.6,
         box_type="minarearect",     # "minarearect" | "poly" | "quad"
-        use_pyclipper=True,         # accurate unclip, fallback if not installed
-        use_dilate=False,           # dilate binary map to connect broken strokes
-        nms_threshold=-1.0,         # <0 disables NMS
+        use_pyclipper=True,
+        use_dilate=False,
+        nms_threshold=-1.0,
         sort_mode="natural",        # "natural" | "top2bottom" | "left2right"
     ),
     rec=RecConfig(
-        resize_mode="fixed_height_pad",  # "fixed_height_pad" | "fixed_size_stretch" | "fixed_height_stretch"
-        pad_align="center",              # "center" | "left" | "right"
+        resize_mode="fixed_height_pad",
+        pad_align="left",           # "left" | "center" | "right"
         normalize_mode="ppocr",
         batch_size=16,
-        use_direction_ensemble=False,    # retry 180° flip when conf is low
+        use_direction_ensemble=False,
     ),
     cls=ClsConfig(label_list=[0, 180, 270, 90]),
 )
 engine = AscendOCR(cfg)
 ```
+
+See `config.yaml` for all configurable parameters with documentation.
 
 ## Encrypted Models
 
@@ -105,9 +130,9 @@ def decrypt(path: str) -> bytes:
     return your_decrypt_function(cipher)
 
 engine = AscendOCR(
-    det_model="models/det.om.enc",
-    rec_model="models/rec.om.enc",
-    cls_model="models/cls.om.enc",
+    det_model="models/310/det.om.enc",
+    rec_model="models/310/rec.om.enc",
+    cls_model="models/310/cls.om.enc",
     decrypt_callback=decrypt,
 )
 ```
@@ -116,9 +141,8 @@ engine = AscendOCR(
 
 ```bash
 python examples/ocr_example.py \
-    --det-model models/det.om \
-    --rec-model models/rec.om \
-    --cls-model models/cls.om \
+    --det-model models/310/det.om \
+    --rec-model models/310/rec.om \
     ./test.png
 ```
 

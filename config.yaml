@@ -1,0 +1,163 @@
+# ascend-ocr configuration file
+# All configurable parameters for the OCR pipeline.
+
+# ======================== Model Paths ========================
+# Models are organized by chip type under models/ directory.
+# Structure: models/{chip}/{det,rec,cls}.om
+chip: "310"
+
+# Or specify model paths directly (overrides chip-based paths):
+# det_model: "models/310/det.om"
+# rec_model: "models/310/rec.om"
+# cls_model: "models/310/cls.om"
+
+# Character dictionary for recognition (leave empty to use bundled default).
+rec_char_dict: ""
+
+# NPU device id.
+device_id: 0
+
+# Whether to run angle classification (0/90/180/270).
+# Disable if input images are already upright.
+use_angle_cls: true
+
+# Enable debug visualizations.
+debug: false
+
+# ======================== Detection ========================
+det:
+  # Maximum side length of resized image. Larger = better accuracy, slower.
+  limit_side_len: 960
+
+  # Multiple to which height/width are rounded (model requirement).
+  limit_multiple: 32
+
+  # Fixed input size (H, W) for static-shape models. Auto-detected from model.
+  # fixed_input_size: null
+
+  # Resize strategy: "pad" | "stretch" | "crop_center"
+  #   pad         - keep aspect ratio, pad with pad_color (best accuracy)
+  #   stretch     - stretch to exact target size (fastest, may distort)
+  #   crop_center - center crop to target size
+  resize_mode: "pad"
+
+  # Padding color [B, G, R] when resize_mode == "pad".
+  pad_color: [0, 0, 0]
+
+  # Normalization: "imagenet" | "ppocr" | "none" | "custom"
+  #   imagenet - mean=[0.485,0.456,0.406], std=[0.229,0.224,0.225], scale=1/255
+  #   ppocr    - mean=[0.5,0.5,0.5],      std=[0.5,0.5,0.5],      scale=1/255
+  #   none     - only divide by 255
+  #   custom   - use the mean/std/scale fields below
+  normalize_mode: "imagenet"
+
+  # Custom normalization (used when normalize_mode == "custom").
+  mean: [0.485, 0.456, 0.406]
+  std: [0.229, 0.224, 0.225]
+  scale: 0.00392156862745098  # 1/255
+
+  # ---- DBNet Post-processing ----
+
+  # Binarization threshold for probability map.
+  thresh: 0.3
+
+  # Minimum mean probability inside a candidate box to keep it.
+  box_thresh: 0.6
+
+  # Polygon expansion ratio. 1.0 = no expansion, 1.5~2.0 = standard DB unclip.
+  unclip_ratio: 1.6
+
+  # Minimum / maximum box area (in original image pixels) to keep.
+  min_box_area: 10.0
+  max_box_area: .inf
+
+  # Minimum / maximum aspect ratio (w/h) of a box to keep.
+  min_aspect_ratio: 0.05
+  max_aspect_ratio: 50.0
+
+  # Maximum number of detected boxes.
+  max_candidates: 1000
+
+  # Box representation: "minarearect" | "poly" | "quad"
+  #   minarearect - 4-point minimum-area rectangle (recommended)
+  #   poly        - raw approximated polygon (more points, slower)
+  #   quad        - same as minarearect but explicitly 4-point
+  box_type: "minarearect"
+
+  # Use pyclipper for accurate polygon un-clipping. Falls back if unavailable.
+  use_pyclipper: true
+
+  # Dilate binary map before finding contours. Connects broken strokes, may merge close boxes.
+  use_dilate: false
+  dilate_kernel_size: 2
+
+  # NMS threshold between candidate boxes. <0 disables NMS.
+  nms_threshold: -1.0
+
+  # Reading-order sorting: "natural" | "top2bottom" | "left2right"
+  #   natural    - group boxes into text lines then sort (default)
+  #   top2bottom - strict top-to-bottom, then left-to-right
+  #   left2right - strict left-to-right, then top-to-bottom
+  sort_mode: "natural"
+
+  # Controls how aggressively boxes are grouped into text lines.
+  # Smaller = more lines, larger = fewer lines. Only used with sort_mode == "natural".
+  line_cluster_factor: 0.5
+
+# ======================== Recognition ========================
+rec:
+  # Fixed input shape (C, H, W). Auto-detected from static models.
+  rec_image_shape: [3, 48, 320]
+
+  # Maximum width; longer images are down-scaled, shorter are padded.
+  max_text_width: 320
+
+  # Minimum width in pixels to guarantee enough CTC time steps.
+  min_text_width: 96
+
+  # Resize strategy: "fixed_height_pad" | "fixed_size_stretch" | "fixed_height_stretch"
+  #   fixed_height_pad     - fixed height, pad to target width (preserves aspect)
+  #   fixed_size_stretch   - stretch to exact rec_image_shape (fastest)
+  #   fixed_height_stretch - fixed height, stretch width to target (may distort)
+  resize_mode: "fixed_height_pad"
+
+  # Padding alignment: "left" | "center" | "right"
+  #   left   - text at left edge, pad right (PP-OCR convention)
+  #   center - center text, pad both sides
+  #   right  - text at right edge, pad left
+  pad_align: "left"
+
+  # Normalization: "imagenet" | "ppocr" | "none" | "custom"
+  normalize_mode: "ppocr"
+
+  # Custom normalization (used when normalize_mode == "custom").
+  mean: [0.5, 0.5, 0.5]
+  std: [0.5, 0.5, 0.5]
+  scale: 0.00392156862745098  # 1/255
+
+  # CTC blank index. 0 = first class (PP-OCR convention). -1 = last class.
+  blank_index: 0
+
+  # Batch size for recognition. Dynamic-shape models always infer one-by-one.
+  batch_size: 8
+
+  # 180-degree flip correction when confidence is low. Runs image twice.
+  use_direction_ensemble: false
+  direction_ensemble_thresh: 0.6
+
+# ======================== Classification ========================
+cls:
+  # Input size (C, H, W).
+  cls_image_shape: [3, 224, 224]
+
+  # Class index -> rotation angle (degrees, counter-clockwise).
+  # Order must match model output order.
+  label_list: [0, 180, 270, 90]
+
+  # Normalization: "imagenet" | "ppocr" | "none" | "custom"
+  normalize_mode: "ppocr"
+
+  # Custom normalization.
+  mean: [0.5, 0.5, 0.5]
+  std: [0.5, 0.5, 0.5]
+  scale: 0.00392156862745098  # 1/255

@@ -134,11 +134,8 @@ class AscendOCR:
             If True: ``(list_of_OCRResult, visualization_image)``.
         """
         img = load_image(image)
-        logger.info(
-            "OCR start, image shape=%s, device=%d",
-            img.shape,
-            self.config.device_id,
-        )
+        logger.info("=== OCR 开始 ===")
+        logger.info("输入图片: %s", img.shape)
 
         # 1. Large-angle classification and rotation.
         angle = 0
@@ -146,15 +143,20 @@ class AscendOCR:
             cls = self.classifier
             if cls is not None:
                 img, angle = cls.rotate_to_upright(img)
-                logger.info("Image rotated by %d degrees to upright", angle)
+                logger.info("[角度分类] 检测角度: %d°, 已旋转校正", angle)
+            else:
+                logger.info("[角度分类] 分类器未加载，跳过")
+        else:
+            logger.info("[角度分类] 已禁用，跳过")
 
         # 2. Text detection.
         boxes = self.detector.detect(img)
         if not boxes:
-            logger.info("No text boxes detected")
+            logger.info("[文字检测] 未检测到文字区域")
             if return_visualization:
                 return [], img
             return []
+        logger.info("[文字检测] 检测到 %d 个文字区域", len(boxes))
 
         # 3. Crop and rectify text lines.
         crops = self.detector.crop_text_lines(img, boxes)
@@ -168,6 +170,11 @@ class AscendOCR:
             OCRResult(box=box, text=text, score=score)
             for box, (text, score) in zip(boxes, rec_results)
         ]
+
+        logger.info("[文字识别] 识别结果:")
+        for idx, r in enumerate(results, 1):
+            logger.info("  %2d. [%.3f] %s", idx, r.score, r.text)
+        logger.info("=== OCR 完成，共 %d 行文字 ===", len(results))
 
         if return_visualization:
             vis = draw_boxes(

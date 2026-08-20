@@ -1,0 +1,11 @@
+.git
+.idea
+.venv
+.pytest_cache
+build
+dist
+*.egg-info
+__pycache__
+**/__pycache__
+*.pyc
+ocr_result.jpg

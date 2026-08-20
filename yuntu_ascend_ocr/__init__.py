@@ -1,0 +1,48 @@
+"""
+yuntu_ascend_ocr
+================
+
+A native, high-cohesion OCR engine for Huawei Ascend (NPU).
+
+Pipeline:
+    1. Load image from local path or HTTP URL.
+    2. Large-angle classification (0 / 90 / 180 / 270).
+    3. Rotate image to 0 degrees if necessary.
+    4. Text-box detection (PaddleOCR-style DBNet post-processing).
+    5. Crop and rectify each text box (perspective transform).
+    6. Text recognition with CTC decoding.
+
+Example
+-------
+>>> from yuntu_ascend_ocr import AscendOCR
+>>> engine = AscendOCR(
+...     det_model="models/ppocrv5_server_det_Ascend910B3.om",
+...     rec_model="models/ppocrv5_rec_Ascend910B3.om",
+...     cls_model="models/angle_cls_Ascend910B3.om",
+...     rec_char_dict="configs/ppocr_keys_v1.txt",
+... )
+>>> result = engine.ocr("https://example.com/image.png")
+>>> for box, text, score in result:
+...     print(box, text, score)
+"""
+
+from .ocr import AscendOCR, OCRResult
+from .angle_classifier import AngleClassifier
+from .text_detector import TextDetector
+from .text_recognizer import TextRecognizer
+from .model import AscendModel
+from .config import OCRConfig, DetConfig, RecConfig, ClsConfig
+
+__version__ = "3.0.0"
+__all__ = [
+    "AscendOCR",
+    "OCRResult",
+    "AngleClassifier",
+    "TextDetector",
+    "TextRecognizer",
+    "AscendModel",
+    "OCRConfig",
+    "DetConfig",
+    "RecConfig",
+    "ClsConfig",
+]

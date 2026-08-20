@@ -270,6 +270,8 @@ def load_config(yaml_path: str, models_root: str = "models") -> OCRConfig:
         cfg.cls_model = cls_model
     if "rec_char_dict" in data and data["rec_char_dict"]:
         cfg.rec_char_dict = data["rec_char_dict"]
+    elif cfg.rec_char_dict is None:
+        cfg.rec_char_dict = default_char_dict_path()
     if "device_id" in data and data["device_id"] is not None:
         cfg.device_id = data["device_id"]
     if "use_angle_cls" in data and data["use_angle_cls"] is not None:

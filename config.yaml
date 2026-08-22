@@ -3,14 +3,14 @@
 
 # ======================== 模型路径 ========================
 # 模型按芯片类型存放在 models/ 目录下
-# 目录结构: models/{芯片型号}/{det,rec,cls}.om
+# 目录结构: models/{芯片型号}/{det,rec,rotate}.om
 chip: "310"
 
-# 模型路径自动根据 chip 拼接: models/{chip}/{det,rec,cls,layout}.om
+# 模型路径自动根据 chip 拼接: models/{chip}/{det,rec,rotate,layout}.om
 # 如需覆盖特定模型，取消注释并修改:
 # det_model: "models/310/det.om"
 # rec_model: "models/310/rec.om"
-# cls_model: "models/310/cls.om"
+# rotate_model: "models/310/rotate.om"
 
 # 识别字典路径（留空则使用内置默认字典）
 rec_char_dict: ""
@@ -147,10 +147,10 @@ rec:
   use_direction_ensemble: false
   direction_ensemble_thresh: 0.6
 
-# ======================== 角度分类 ========================
-cls:
+# ======================== 角度校正 ========================
+rotate:
   # 输入尺寸 (C, H, W)
-  cls_image_shape: [3, 512, 512]
+  rotate_image_shape: [3, 512, 512]
 
   # 类别索引 -> 旋转角度（度，逆时针），顺序必须与模型输出一致
   label_list: [0, 180, 270, 90]

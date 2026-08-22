@@ -10,7 +10,7 @@ from typing import Tuple
 import cv2
 import numpy as np
 
-from .config import ClsConfig, DetConfig, RecConfig
+from .config import RotateConfig, DetConfig, RecConfig
 from .exceptions import PreprocessError
 from .image_utils import normalize_image, resize_with_aspect_ratio
 
@@ -110,7 +110,7 @@ def preprocess_for_detection(
     return tensor, (scale_h, scale_w), (resize_h, resize_w)
 
 
-def preprocess_for_classification(img: np.ndarray, cfg: ClsConfig) -> np.ndarray:
+def preprocess_for_classification(img: np.ndarray, cfg: RotateConfig) -> np.ndarray:
     """
     Preprocess an image for the large-angle classifier.
 
@@ -121,7 +121,7 @@ def preprocess_for_classification(img: np.ndarray, cfg: ClsConfig) -> np.ndarray
     Returns:
         Float32 tensor shape (1, 3, H, W).
     """
-    _, target_h, target_w = cfg.cls_image_shape
+    _, target_h, target_w = cfg.rotate_image_shape
     resized = cv2.resize(img, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
     scale, mean, std = _get_norm_params(cfg)
     tensor = normalize_image(resized, scale=scale, mean=mean, std=std)

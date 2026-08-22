@@ -5,7 +5,7 @@ from typing import Optional, Callable
 
 import numpy as np
 
-from .config import ClsConfig, OCRConfig
+from .config import RotateConfig
 from .image_utils import rotate_image
 from .model import AscendModel
 from .preprocess import preprocess_for_classification
@@ -19,11 +19,11 @@ class AngleClassifier:
     def __init__(
         self,
         model_path: str,
-        cfg: Optional[ClsConfig] = None,
+        cfg: Optional[RotateConfig] = None,
         device_id: int = 0,
         decrypt_callback: Optional[Callable[[str], bytes]] = None,
     ):
-        self.cfg = cfg or ClsConfig()
+        self.cfg = cfg or RotateConfig()
         self.model = AscendModel(
             model_path, device_id=device_id, decrypt_callback=decrypt_callback
         )
@@ -43,11 +43,11 @@ class AngleClassifier:
         probs = outputs[0]
         if probs.ndim == 2:
             probs = probs[0]
-        cls_id = int(np.argmax(probs))
-        confidence = float(probs[cls_id])
-        cls_id = max(0, min(cls_id, len(self.cfg.label_list) - 1))
-        angle = self.cfg.label_list[cls_id]
-        logger.debug("Angle classification: cls_id=%d angle=%d confidence=%.3f", cls_id, angle, confidence)
+        label_id = int(np.argmax(probs))
+        confidence = float(probs[label_id])
+        label_id = max(0, min(label_id, len(self.cfg.label_list) - 1))
+        angle = self.cfg.label_list[label_id]
+        logger.debug("Angle classification: label_id=%d angle=%d confidence=%.3f", label_id, angle, confidence)
         return angle, confidence
 
     def rotate_to_upright(self, img: np.ndarray) -> tuple:

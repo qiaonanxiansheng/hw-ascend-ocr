@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from ascend_ocr.config import ClsConfig, DetConfig, RecConfig
+from ascend_ocr.config import RotateConfig, DetConfig, RecConfig
 from ascend_ocr.preprocess import (
     preprocess_for_classification,
     preprocess_for_detection,
@@ -36,10 +36,10 @@ def test_det_normalize_modes():
         assert tensor.shape == (1, 3, 128, 128)
 
 
-def test_cls_normalize_modes():
+def test_rotate_normalize_modes():
     img = np.random.randint(0, 255, (100, 80, 3), dtype=np.uint8)
     for mode in ("imagenet", "ppocr", "none", "custom"):
-        cfg = ClsConfig(normalize_mode=mode)
+        cfg = RotateConfig(normalize_mode=mode)
         tensor = preprocess_for_classification(img, cfg)
         assert tensor.shape == (1, 3, 224, 224)
 

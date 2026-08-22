@@ -151,7 +151,7 @@ class AscendOCR:
         engine = AscendOCR(
             det_model="models/det.om",
             rec_model="models/rec.om",
-            cls_model="models/cls.om",
+            rotate_model="models/rotate.om",
             rec_char_dict="configs/ppocr_keys_v1.txt",
         )
         result = engine.ocr("./image.png")
@@ -164,7 +164,7 @@ class AscendOCR:
         Args:
             config: ``OCRConfig`` instance. If omitted, a default config is used.
             **overrides: Keyword shortcuts for common config fields, e.g.
-                ``det_model=..., rec_model=..., cls_model=..., device_id=...``.
+                ``det_model=..., rec_model=..., rotate_model=..., device_id=...``.
         """
         if config is None:
             config = OCRConfig()
@@ -190,9 +190,9 @@ class AscendOCR:
             raise AscendOCRError("det_model is required")
         if self.config.rec_model is None:
             raise AscendOCRError("rec_model is required")
-        if self.config.use_rotate and self.config.cls_model is None:
+        if self.config.use_rotate and self.config.rotate_model is None:
             logger.warning(
-                "use_rotate=True but cls_model is not provided; disabling rotation"
+                "use_rotate=True but rotate_model is not provided; disabling rotation"
             )
             self.config.use_rotate = False
 
@@ -223,8 +223,8 @@ class AscendOCR:
     def classifier(self) -> Optional[AngleClassifier]:
         if self._classifier is None and self.config.use_rotate:
             self._classifier = AngleClassifier(
-                self.config.cls_model,
-                cfg=self.config.cls,
+                self.config.rotate_model,
+                cfg=self.config.rotate,
                 device_id=self.config.device_id,
                 decrypt_callback=self.config.decrypt_callback,
             )
@@ -326,12 +326,12 @@ class AscendOCR:
         angle = 0
         img = orig_img
         if use_rotate:
-            cls = self.classifier
-            if cls is not None:
+            rotator = self.classifier
+            if rotator is not None:
                 t0 = time.perf_counter()
-                img, angle, cls_conf = cls.rotate_to_upright(img)
-                t_cls = time.perf_counter() - t0
-                logger.info("[角度分类] 角度: %d°, 置信度: %.3f, 耗时: %.1fms", angle, cls_conf, t_cls * 1000)
+                img, angle, rotate_conf = rotator.rotate_to_upright(img)
+                t_rotate = time.perf_counter() - t0
+                logger.info("[角度分类] 角度: %d°, 置信度: %.3f, 耗时: %.1fms", angle, rotate_conf, t_rotate * 1000)
             else:
                 logger.debug("[角度分类] 分类器未加载，跳过")
         else:
@@ -439,12 +439,12 @@ class AscendOCR:
         angle = 0
         img = orig_img
         if use_rotate:
-            cls = self.classifier
-            if cls is not None:
+            rotator = self.classifier
+            if rotator is not None:
                 t0 = time.perf_counter()
-                img, angle, cls_conf = cls.rotate_to_upright(img)
-                t_cls = time.perf_counter() - t0
-                logger.info("[角度分类] 角度: %d°, 置信度: %.3f, 耗时: %.1fms", angle, cls_conf, t_cls * 1000)
+                img, angle, rotate_conf = rotator.rotate_to_upright(img)
+                t_rotate = time.perf_counter() - t0
+                logger.info("[角度分类] 角度: %d°, 置信度: %.3f, 耗时: %.1fms", angle, rotate_conf, t_rotate * 1000)
             else:
                 logger.debug("[角度分类] 分类器未加载，跳过")
         else:

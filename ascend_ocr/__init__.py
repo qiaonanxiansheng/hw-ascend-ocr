@@ -18,7 +18,7 @@ Example
 >>> engine = AscendOCR(
 ...     det_model="models/ppocrv5_server_det_Ascend910B3.om",
 ...     rec_model="models/ppocrv5_rec_Ascend910B3.om",
-...     cls_model="models/angle_cls_Ascend910B3.om",
+...     rotate_model="models/rotate.om",
 ...     rec_char_dict="configs/ppocr_keys_v1.txt",
 ... )
 >>> results, angle = engine.ocr("https://example.com/image.png")
@@ -32,7 +32,7 @@ from .layout_analyzer import LayoutAnalyzer, LayoutRegion
 from .text_detector import TextDetector
 from .text_recognizer import TextRecognizer
 from .model import AscendModel
-from .config import OCRConfig, DetConfig, RecConfig, ClsConfig, load_config
+from .config import OCRConfig, DetConfig, RecConfig, RotateConfig, load_config
 
 __version__ = "3.0.0"
 __all__ = [
@@ -47,6 +47,6 @@ __all__ = [
     "OCRConfig",
     "DetConfig",
     "RecConfig",
-    "ClsConfig",
+    "RotateConfig",
     "load_config",
 ]

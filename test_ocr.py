@@ -22,7 +22,7 @@ def main():
     parser.add_argument("--chip", default=None, help="芯片型号（覆盖配置文件）")
     parser.add_argument("--det", default=None, help="检测模型路径（覆盖配置文件）")
     parser.add_argument("--rec", default=None, help="识别模型路径（覆盖配置文件）")
-    parser.add_argument("--cls", default=None, help="分类模型路径")
+    parser.add_argument("--rotate", default=None, help="角度校正模型路径")
     parser.add_argument("--device", type=int, default=None, help="NPU 设备 ID")
     parser.add_argument("--image", default="docs/test.jpg", help="测试图片路径")
     args = parser.parse_args()
@@ -40,13 +40,13 @@ def main():
     if args.chip:
         cfg.det_model = os.path.join("models", args.chip, "det.om")
         cfg.rec_model = os.path.join("models", args.chip, "rec.om")
-        cfg.cls_model = os.path.join("models", args.chip, "cls.om")
+        cfg.rotate_model = os.path.join("models", args.chip, "rotate.om")
     if args.det:
         cfg.det_model = args.det
     if args.rec:
         cfg.rec_model = args.rec
-    if args.cls:
-        cfg.cls_model = args.cls
+    if args.rotate:
+        cfg.rotate_model = args.rotate
     if args.device is not None:
         cfg.device_id = args.device
 

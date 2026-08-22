@@ -153,18 +153,18 @@ class RecConfig:
 
 
 @dataclass
-class ClsConfig:
-    """Large-angle classification configuration."""
+class RotateConfig:
+    """Large-angle rotation classification configuration."""
 
-    # Input size expected by the classification model.
-    cls_image_shape: tuple = (3, 224, 224)
+    # Input size expected by the rotation model.
+    rotate_image_shape: tuple = (3, 224, 224)
 
     # Class index -> rotation angle (degrees, counter-clockwise).
     # The order must match the model output order.
     label_list: List[int] = field(default_factory=lambda: [0, 180, 270, 90])
 
     # Minimum confidence to apply rotation. Below this threshold, skip rotation.
-    cls_min_confidence: float = 0.9
+    rotate_min_confidence: float = 0.9
 
     # Normalization preset. Same values as DetConfig.
     normalize_mode: str = "ppocr"
@@ -182,7 +182,7 @@ class OCRConfig:
     # Model paths (OM files).
     det_model: Optional[str] = None
     rec_model: Optional[str] = None
-    cls_model: Optional[str] = None
+    rotate_model: Optional[str] = None
     layout_model: Optional[str] = None
 
     # Character dictionary path for recognition.
@@ -198,7 +198,7 @@ class OCRConfig:
     # Sub-configs.
     det: DetConfig = field(default_factory=DetConfig)
     rec: RecConfig = field(default_factory=RecConfig)
-    cls: ClsConfig = field(default_factory=ClsConfig)
+    rotate: RotateConfig = field(default_factory=RotateConfig)
 
     # Whether to run large-angle classification (0/90/180/270) and auto-rotate.
     # Can be overridden per-call via the use_rotate parameter.
@@ -239,23 +239,23 @@ def load_config(yaml_path: str, models_root: str = "models") -> OCRConfig:
     # Build sub-configs
     det = DetConfig()
     rec = RecConfig()
-    cls = ClsConfig()
+    rotate = RotateConfig()
 
     if "det" in data and data["det"]:
         _apply_dict(det, data["det"])
     if "rec" in data and data["rec"]:
         _apply_dict(rec, data["rec"])
-    if "cls" in data and data["cls"]:
-        _apply_dict(cls, data["cls"])
+    if "rotate" in data and data["rotate"]:
+        _apply_dict(rotate, data["rotate"])
 
     # Build top-level config
-    cfg = OCRConfig(det=det, rec=rec, cls=cls)
+    cfg = OCRConfig(det=det, rec=rec, rotate=rotate)
 
     # Handle chip-based model paths
     chip = data.get("chip")
     det_model = data.get("det_model")
     rec_model = data.get("rec_model")
-    cls_model = data.get("cls_model")
+    rotate_model = data.get("rotate_model")
     layout_model = data.get("layout_model")
 
     if chip:
@@ -264,8 +264,8 @@ def load_config(yaml_path: str, models_root: str = "models") -> OCRConfig:
             det_model = os.path.join(chip_dir, "det.om")
         if not rec_model:
             rec_model = os.path.join(chip_dir, "rec.om")
-        if not cls_model:
-            cls_model = os.path.join(chip_dir, "cls.om")
+        if not rotate_model:
+            rotate_model = os.path.join(chip_dir, "rotate.om")
         if not layout_model:
             layout_model = os.path.join(chip_dir, "PP-DocLayoutV3.om")
 
@@ -274,8 +274,8 @@ def load_config(yaml_path: str, models_root: str = "models") -> OCRConfig:
         cfg.det_model = det_model
     if rec_model:
         cfg.rec_model = rec_model
-    if cls_model:
-        cfg.cls_model = cls_model
+    if rotate_model:
+        cfg.rotate_model = rotate_model
     if layout_model:
         cfg.layout_model = layout_model
     if "rec_char_dict" in data and data["rec_char_dict"]:

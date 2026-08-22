@@ -17,7 +17,7 @@ def main():
     parser.add_argument("image", help="Local path or HTTP(S) URL of the image")
     parser.add_argument("--det-model", required=True, help="Path to detection OM model")
     parser.add_argument("--rec-model", required=True, help="Path to recognition OM model")
-    parser.add_argument("--cls-model", default=None, help="Path to angle classification OM model")
+    parser.add_argument("--rotate-model", default=None, help="Path to angle rotation OM model")
     parser.add_argument(
         "--rec-char-dict",
         default=default_char_dict_path(),
@@ -41,7 +41,7 @@ def main():
     engine = AscendOCR(
         det_model=args.det_model,
         rec_model=args.rec_model,
-        cls_model=args.cls_model,
+        rotate_model=args.rotate_model,
         rec_char_dict=args.rec_char_dict,
         device_id=args.device,
     )

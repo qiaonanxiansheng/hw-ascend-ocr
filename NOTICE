@@ -1,13 +1,10 @@
 ascend-ocr
 Copyright (c) 2025 ascend-ocr contributors
 
-This product includes code derived from PaddleOCR, which is licensed
-under the Apache License, Version 2.0.
+This product includes code derived from open-source OCR projects
+licensed under the Apache License, Version 2.0.
 
-  Source:  https://github.com/PaddlePaddle/PaddleOCR
-  License: https://github.com/PaddlePaddle/PaddleOCR/blob/main/LICENSE
-
-The following components are derived from or inspired by PaddleOCR:
+The following components are derived from or inspired by open-source OCR work:
   - DBNet text detection post-processing (postprocess.py)
   - CTC-based text recognition decoding (recognition.py)
   - Image preprocessing and perspective transform (preprocess.py, image_utils.py)

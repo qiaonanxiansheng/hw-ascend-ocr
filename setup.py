@@ -9,7 +9,7 @@ setup(
     name="ascend-ocr",
     version="3.0.0",
     author="ascend-ocr contributors",
-    description="Native, high-cohesion OCR engine for Huawei Ascend (NPU).",
+    description="Native, high-cohesion OCR engine for Ascend NPU.",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/your-org/ascend-ocr",

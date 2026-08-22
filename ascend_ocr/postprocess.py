@@ -20,7 +20,7 @@ def _unclip(points: np.ndarray, unclip_ratio: float, use_pyclipper: bool = True)
     """
     Expand a polygon by ``unclip_ratio``.
 
-    Uses ``pyclipper`` (PaddleOCR's approach) when available and requested,
+    Uses ``pyclipper`` when available and requested,
     otherwise falls back to a geometric approximation.
     """
     points = points.reshape(-1, 2).astype(np.float32)

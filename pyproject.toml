@@ -5,14 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ascend-ocr"
 version = "3.0.0"
-description = "Native, high-cohesion OCR engine for Huawei Ascend (NPU)."
+description = "Native, high-cohesion OCR engine for Ascend NPU."
 readme = "README.md"
 requires-python = ">=3.8"
 license = {file = "LICENSE"}
 authors = [
     {name = "ascend-ocr contributors"},
 ]
-keywords = ["ocr", "ascend", "npu", "paddleocr", "huawei", "layout-analysis"]
+keywords = ["ocr", "ascend", "npu", "layout-analysis"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",

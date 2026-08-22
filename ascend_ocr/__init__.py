@@ -2,13 +2,13 @@
 ascend_ocr
 ==========
 
-A native, high-cohesion OCR engine for Huawei Ascend (NPU).
+A native, high-cohesion OCR engine for Ascend NPU.
 
 Pipeline:
     1. Load image from local path or HTTP URL.
     2. Large-angle classification (0 / 90 / 180 / 270).
     3. Rotate image to 0 degrees if necessary.
-    4. Text-box detection (PaddleOCR-style DBNet post-processing).
+    4. Text-box detection (DBNet post-processing).
     5. Crop and rectify each text box (perspective transform).
     6. Text recognition with CTC decoding.
 

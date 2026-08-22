@@ -15,7 +15,7 @@ def default_char_dict_path() -> str:
 @dataclass
 class DetConfig:
     """
-    Text-detection configuration (PaddleOCR/PP-OCR style).
+    Text-detection configuration (DBNet style).
 
     All algorithm choices are exposed as switches so you can tune for accuracy
     or speed depending on the scene.

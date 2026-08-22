@@ -148,7 +148,6 @@ def preprocess_for_recognition(
 
     mode = cfg.resize_mode.lower()
     if mode == "fixed_height_pad":
-        # PaddleOCR standard preprocessing:
         # 1. Resize to target height, keep aspect ratio
         # 2. If width > target_w, resize to target_w (squeeze)
         # 3. If width < target_w, pad to target_w (left-aligned by default)
@@ -162,7 +161,7 @@ def preprocess_for_recognition(
             # Image wider than model input: squeeze to target width
             resized = cv2.resize(resized, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
         elif resized_w < target_w:
-            # Image narrower than model input: pad (left-aligned like PaddleOCR)
+            # Image narrower than model input: pad (left-aligned)
             pad_total = target_w - resized_w
             pad_left, pad_right = 0, pad_total  # left padding
             resized = cv2.copyMakeBorder(

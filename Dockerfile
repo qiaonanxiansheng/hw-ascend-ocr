@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=ascendhub/cann:8.1.rc1-310p-ubuntu22.04-py3.11
+ARG BASE_IMAGE=cann:8.1.rc1-ubuntu22.04-py3.11
 FROM ${BASE_IMAGE}
 
 # Install Python dependencies

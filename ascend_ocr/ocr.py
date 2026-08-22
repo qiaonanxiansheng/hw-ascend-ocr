@@ -144,7 +144,7 @@ def _cluster_text_to_regions(
 
 class AscendOCR:
     """
-    End-to-end OCR engine for Huawei Ascend.
+    End-to-end OCR engine for Ascend NPU.
 
     Usage::
 

@@ -1,6 +1,6 @@
 # ascend-ocr
 
-A native, high-performance OCR engine for Huawei Ascend NPU, with optional layout analysis support.
+A native, high-performance OCR engine for Ascend NPU, with optional layout analysis support.
 
 ## Features
 
@@ -8,7 +8,7 @@ A native, high-performance OCR engine for Huawei Ascend NPU, with optional layou
 - **Layout analysis**: document layout detection via PP-DocLayoutV3, with text clustering into layout regions
 - **Input support**: local file path, HTTP/HTTPS URL, raw bytes, or `numpy.ndarray`
 - **Large-angle correction**: automatically rotates images by 0/90/180/270 degrees
-- **PaddleOCR-compatible**: DBNet detection, perspective transform, CTC decoding
+- **Standard pipeline**: DBNet detection, perspective transform, CTC decoding
 - **Production ready**: logging, exception handling, resource cleanup, process-level ACL singleton
 - **REST API**: FastAPI-based HTTP service with `/api/ocr` and `/api/layout-ocr` endpoints
 
@@ -319,7 +319,7 @@ docker run --device /dev/davinci0 -p 8000:8000 ascend-ocr
 To use a different CANN base image:
 
 ```bash
-docker build --build-arg BASE_IMAGE=ascendhub/cann:8.0.0-910B3-ubuntu22.04-py3.11 -t ascend-ocr .
+docker build --build-arg BASE_IMAGE=your-registry/cann:8.0.0-ubuntu22.04-py3.11 -t ascend-ocr .
 ```
 
 ## Performance & Accuracy Tips
@@ -335,4 +335,4 @@ docker build --build-arg BASE_IMAGE=ascendhub/cann:8.0.0-910B3-ubuntu22.04-py3.1
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-This project includes code derived from [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) (Apache 2.0 License). See [NOTICE](NOTICE) for details.
+This project includes code derived from open-source OCR projects. See [NOTICE](NOTICE) for details.

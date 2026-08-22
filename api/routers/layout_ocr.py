@@ -70,10 +70,12 @@ async def layout_ocr(
         logger.error("Layout OCR 失败: %s", e, exc_info=True)
         return LayoutOCRResponse(code=500, message=str(e))
 
-    # Build response
+    # Build response: include ALL regions (table/seal etc. have empty lines)
+    ocr_map = {id(region): ocr_results for region, ocr_results in region_ocr_results}
     region_responses = []
     total_lines = 0
-    for idx, (region, ocr_results) in enumerate(region_ocr_results):
+    for idx, region in enumerate(regions):
+        ocr_results = ocr_map.get(id(region), [])
         lines = [_to_line_response(i + 1, r) for i, r in enumerate(ocr_results)]
         full_text = "\n".join(r.text for r in ocr_results)
         total_lines += len(ocr_results)

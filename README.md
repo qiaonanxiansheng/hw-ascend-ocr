@@ -148,7 +148,7 @@ engine = AscendOCR(cfg)
 ### 启动服务
 
 ```bash
-uvicorn api.app:app --host 0.0.0.0 --port 8000
+uvicorn api.app:app --host 0.0.0.0 --port 13502
 ```
 
 ### 全文识别接口
@@ -171,7 +171,7 @@ curl -X POST \
   -F "file_id=test1" \
   -F "file=@test.jpg" \
   -F "use_rotate=true" \
-  http://localhost:8000/api/ocr
+  http://localhost:13502/api/ocr
 ```
 
 **响应示例：**
@@ -217,7 +217,7 @@ curl -X POST \
   -F "file_id=test1" \
   -F "file=@test.jpg" \
   -F "score_threshold=0.6" \
-  http://localhost:8000/api/layout-ocr
+  http://localhost:13502/api/layout-ocr
 ```
 
 **响应示例：**
@@ -272,7 +272,7 @@ curl -X POST \
 
 ```bash
 docker build -t ascend-ocr .
-docker run --device /dev/davinci0 -p 8000:8000 ascend-ocr
+docker run --device /dev/davinci0 -p 13502:13502 ascend-ocr
 ```
 
 使用其他 CANN 基础镜像：

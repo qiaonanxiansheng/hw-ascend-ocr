@@ -1,5 +1,7 @@
-ARG BASE_IMAGE=cann:8.1.rc1-ubuntu22.04-py3.11
-FROM ${BASE_IMAGE}
+FROM swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:8.1.rc1-310p-ubuntu22.04-py3.11
+
+# pip 使用清华源
+RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 
 # Install Python dependencies
 COPY requirements.txt /tmp/requirements.txt
@@ -14,7 +16,7 @@ RUN pip install --no-cache-dir --no-deps -e .
 RUN echo "source /usr/local/Ascend/ascend-toolkit/set_env.sh" >> /root/.bashrc
 
 # Expose OCR service port
-EXPOSE 8000
+EXPOSE 13502
 
 # Default command: start OCR API service
-CMD ["/bin/bash", "-c", "source /usr/local/Ascend/ascend-toolkit/set_env.sh && uvicorn api.app:app --host 0.0.0.0 --port 8000"]
+CMD ["/bin/bash", "-c", "source /usr/local/Ascend/ascend-toolkit/set_env.sh && uvicorn api.app:app --host 0.0.0.0 --port 13502"]

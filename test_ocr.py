@@ -60,10 +60,10 @@ def main():
 
     engine = AscendOCR(cfg)
 
-    results = engine.ocr(args.image)
+    results, angle = engine.ocr(args.image)
 
     print(f"\n{'='*50}")
-    print(f"检测到 {len(results)} 行文字")
+    print(f"检测到 {len(results)} 行文字, 旋转角度: {angle}°")
     print(f"{'='*50}")
     for idx, r in enumerate(results, 1):
         pts = r.box.reshape(-1, 2).astype(int).tolist()

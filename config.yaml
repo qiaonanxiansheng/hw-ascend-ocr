@@ -6,10 +6,11 @@
 # 目录结构: models/{芯片型号}/{det,rec,cls}.om
 chip: "310"
 
-# 也可以直接指定模型路径（会覆盖上面基于芯片的路径）:
+# 模型路径自动根据 chip 拼接: models/{chip}/{det,rec,cls,layout}.om
+# 如需覆盖特定模型，取消注释并修改:
 # det_model: "models/310/det.om"
 # rec_model: "models/310/rec.om"
-cls_model: "models/310/rotate.om"
+# cls_model: "models/310/cls.om"
 
 # 识别字典路径（留空则使用内置默认字典）
 rec_char_dict: ""
@@ -17,12 +18,13 @@ rec_char_dict: ""
 # NPU 设备 ID
 device_id: 0
 
-# 是否进行角度分类（0/90/180/270度）
+# 是否进行大角度分类（0/90/180/270度）并自动转正
 # 如果输入图片已经是正向的，或没有分类模型，可以关闭
-use_angle_cls: true
+# 可在调用时通过 use_rotate 参数覆盖
+use_rotate: true
 
 # 是否启用调试可视化
-debug: false
+debug: true
 
 # ======================== 文字检测 ========================
 det:

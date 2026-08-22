@@ -163,6 +163,9 @@ class ClsConfig:
     # The order must match the model output order.
     label_list: List[int] = field(default_factory=lambda: [0, 180, 270, 90])
 
+    # Minimum confidence to apply rotation. Below this threshold, skip rotation.
+    cls_min_confidence: float = 0.9
+
     # Normalization preset. Same values as DetConfig.
     normalize_mode: str = "ppocr"
 
@@ -180,6 +183,7 @@ class OCRConfig:
     det_model: Optional[str] = None
     rec_model: Optional[str] = None
     cls_model: Optional[str] = None
+    layout_model: Optional[str] = None
 
     # Character dictionary path for recognition.
     rec_char_dict: Optional[str] = None
@@ -196,8 +200,9 @@ class OCRConfig:
     rec: RecConfig = field(default_factory=RecConfig)
     cls: ClsConfig = field(default_factory=ClsConfig)
 
-    # Whether to run angle classification. Disable if input is already upright.
-    use_angle_cls: bool = True
+    # Whether to run large-angle classification (0/90/180/270) and auto-rotate.
+    # Can be overridden per-call via the use_rotate parameter.
+    use_rotate: bool = True
 
     # Whether to return debug visualizations.
     debug: bool = False
@@ -251,6 +256,7 @@ def load_config(yaml_path: str, models_root: str = "models") -> OCRConfig:
     det_model = data.get("det_model")
     rec_model = data.get("rec_model")
     cls_model = data.get("cls_model")
+    layout_model = data.get("layout_model")
 
     if chip:
         chip_dir = os.path.join(models_root, chip)
@@ -260,6 +266,8 @@ def load_config(yaml_path: str, models_root: str = "models") -> OCRConfig:
             rec_model = os.path.join(chip_dir, "rec.om")
         if not cls_model:
             cls_model = os.path.join(chip_dir, "cls.om")
+        if not layout_model:
+            layout_model = os.path.join(chip_dir, "PP-DocLayoutV3.om")
 
     # Apply top-level fields
     if det_model:
@@ -268,14 +276,16 @@ def load_config(yaml_path: str, models_root: str = "models") -> OCRConfig:
         cfg.rec_model = rec_model
     if cls_model:
         cfg.cls_model = cls_model
+    if layout_model:
+        cfg.layout_model = layout_model
     if "rec_char_dict" in data and data["rec_char_dict"]:
         cfg.rec_char_dict = data["rec_char_dict"]
     elif cfg.rec_char_dict is None:
         cfg.rec_char_dict = default_char_dict_path()
     if "device_id" in data and data["device_id"] is not None:
         cfg.device_id = data["device_id"]
-    if "use_angle_cls" in data and data["use_angle_cls"] is not None:
-        cfg.use_angle_cls = data["use_angle_cls"]
+    if "use_rotate" in data and data["use_rotate"] is not None:
+        cfg.use_rotate = data["use_rotate"]
     if "debug" in data and data["debug"] is not None:
         cfg.debug = data["debug"]
 

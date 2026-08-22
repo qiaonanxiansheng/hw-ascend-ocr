@@ -76,7 +76,7 @@ All parameters can be set in `config.yaml`:
 ```yaml
 chip: "310"           # Chip type, used to locate models/{chip}/
 device_id: 0
-use_angle_cls: true
+use_rotate: true
 ```
 
 Or programmatically with `OCRConfig`:
@@ -172,7 +172,7 @@ ascend_ocr/
 | Best accuracy | `det.resize_mode="pad"`, `det.use_pyclipper=True`, `det.unclip_ratio=1.6~2.0`, `rec.use_direction_ensemble=True` |
 | Maximum speed | `det.resize_mode="stretch"`, `det.box_type="minarearect"`, `rec.resize_mode="fixed_size_stretch"`, `rec.batch_size=16+` |
 | Small / dense text | Increase `det.limit_side_len`, enable `det.use_dilate`, lower `det.box_thresh` |
-| No angle correction needed | Set `use_angle_cls=False` to skip the classifier entirely |
+| No angle correction needed | Set `use_rotate=False` to skip the classifier entirely |
 
 ## Notes
 

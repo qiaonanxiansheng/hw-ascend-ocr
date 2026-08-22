@@ -46,7 +46,7 @@ def main():
         device_id=args.device,
     )
 
-    results, vis = engine.ocr(args.image, return_visualization=True)
+    results, angle, vis = engine.ocr(args.image, return_visualization=True)
 
     print("\n=== OCR Results ===")
     for idx, r in enumerate(results, 1):

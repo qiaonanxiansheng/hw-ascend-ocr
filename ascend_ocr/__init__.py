@@ -21,13 +21,14 @@ Example
 ...     cls_model="models/angle_cls_Ascend910B3.om",
 ...     rec_char_dict="configs/ppocr_keys_v1.txt",
 ... )
->>> result = engine.ocr("https://example.com/image.png")
->>> for box, text, score in result:
-...     print(box, text, score)
+>>> results, angle = engine.ocr("https://example.com/image.png")
+>>> for r in results:
+...     print(r.box, r.text, r.score)
 """
 
 from .ocr import AscendOCR, OCRResult
 from .angle_classifier import AngleClassifier
+from .layout_analyzer import LayoutAnalyzer, LayoutRegion
 from .text_detector import TextDetector
 from .text_recognizer import TextRecognizer
 from .model import AscendModel
@@ -38,6 +39,8 @@ __all__ = [
     "AscendOCR",
     "OCRResult",
     "AngleClassifier",
+    "LayoutAnalyzer",
+    "LayoutRegion",
     "TextDetector",
     "TextRecognizer",
     "AscendModel",

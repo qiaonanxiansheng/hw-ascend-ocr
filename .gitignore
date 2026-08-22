@@ -33,3 +33,4 @@ models/**/*.onnx
 
 # Test outputs
 ocr_result.jpg
+.claude/

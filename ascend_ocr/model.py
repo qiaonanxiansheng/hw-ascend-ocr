@@ -14,7 +14,7 @@ from typing import Callable, List, Optional, Tuple
 import numpy as np
 
 from .acl_env import acl_get_context, acl_init, acl_release
-from .exceptions import InferenceError, ModelLoadError, YuntuAscendOCRError
+from .exceptions import InferenceError, ModelLoadError, AscendOCRError
 
 try:
     import acl
@@ -47,7 +47,7 @@ class AscendModel:
                 the decrypted model bytes. When omitted the file is loaded directly.
         """
         if acl is None:
-            raise YuntuAscendOCRError(
+            raise AscendOCRError(
                 "The 'acl' package is not available on this machine."
             )
 

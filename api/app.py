@@ -22,7 +22,7 @@ from ascend_ocr.exceptions import (
     InferenceError,
     ModelLoadError,
     PreprocessError,
-    YuntuAscendOCRError,
+    AscendOCRError,
 )
 from api.routers import ocr as ocr_router_module
 from api.routers import layout_ocr as layout_ocr_router_module
@@ -56,8 +56,8 @@ app.include_router(ocr_router)
 app.include_router(layout_ocr_router)
 
 
-@app.exception_handler(YuntuAscendOCRError)
-async def ocr_error_handler(request: Request, exc: YuntuAscendOCRError):
+@app.exception_handler(AscendOCRError)
+async def ocr_error_handler(request: Request, exc: AscendOCRError):
     status_map = {
         ModelLoadError: 503,
         InferenceError: 500,

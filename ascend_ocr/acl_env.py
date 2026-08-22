@@ -10,7 +10,7 @@ import atexit
 import threading
 from typing import Optional
 
-from .exceptions import YuntuAscendOCRError
+from .exceptions import AscendOCRError
 
 
 try:
@@ -38,7 +38,7 @@ class _ACLEnvironment:
 
     def _ensure_acl(self) -> None:
         if acl is None:
-            raise YuntuAscendOCRError(
+            raise AscendOCRError(
                 "acl package is not available. "
                 "Please run on an Ascend environment with the CANN toolkit installed."
             ) from _ACL_IMPORT_ERROR
@@ -50,19 +50,19 @@ class _ACLEnvironment:
             if not self._initialized:
                 ret = acl.init()
                 if ret != 0:
-                    raise YuntuAscendOCRError(f"acl.init failed with error code {ret}")
+                    raise AscendOCRError(f"acl.init failed with error code {ret}")
                 self._initialized = True
                 atexit.register(self.finalize)
 
             if device_id not in self._device_contexts:
                 ret = acl.rt.set_device(device_id)
                 if ret != 0:
-                    raise YuntuAscendOCRError(
+                    raise AscendOCRError(
                         f"acl.rt.set_device({device_id}) failed with error code {ret}"
                     )
                 context, ret = acl.rt.create_context(device_id)
                 if ret != 0:
-                    raise YuntuAscendOCRError(
+                    raise AscendOCRError(
                         f"acl.rt.create_context({device_id}) failed with error code {ret}"
                     )
                 self._device_contexts[device_id] = {
@@ -77,7 +77,7 @@ class _ACLEnvironment:
         """Return the ACL context handle for the given device."""
         with self._lock:
             if device_id not in self._device_contexts:
-                raise YuntuAscendOCRError(
+                raise AscendOCRError(
                     f"ACL context for device {device_id} has not been initialized"
                 )
             return self._device_contexts[device_id]["context"]

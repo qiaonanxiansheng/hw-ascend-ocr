@@ -16,7 +16,7 @@ import numpy as np
 
 from .angle_classifier import AngleClassifier
 from .config import OCRConfig
-from .exceptions import YuntuAscendOCRError
+from .exceptions import AscendOCRError
 from .image_utils import draw_boxes, load_image
 from .layout_analyzer import LayoutAnalyzer, LayoutRegion
 from .text_detector import TextDetector
@@ -174,7 +174,7 @@ class AscendOCR:
             if hasattr(config, key):
                 setattr(config, key, value)
             else:
-                raise YuntuAscendOCRError(f"Unknown OCRConfig field: {key}")
+                raise AscendOCRError(f"Unknown OCRConfig field: {key}")
 
         self.config = config
         self._validate_config()
@@ -187,9 +187,9 @@ class AscendOCR:
 
     def _validate_config(self) -> None:
         if self.config.det_model is None:
-            raise YuntuAscendOCRError("det_model is required")
+            raise AscendOCRError("det_model is required")
         if self.config.rec_model is None:
-            raise YuntuAscendOCRError("rec_model is required")
+            raise AscendOCRError("rec_model is required")
         if self.config.use_rotate and self.config.cls_model is None:
             logger.warning(
                 "use_rotate=True but cls_model is not provided; disabling rotation"
@@ -417,7 +417,7 @@ class AscendOCR:
             - angle: 检测到的旋转角度。
         """
         if self.layout_analyzer is None:
-            raise YuntuAscendOCRError("layout_model is not configured")
+            raise AscendOCRError("layout_model is not configured")
 
         if use_rotate is None:
             use_rotate = self.config.use_rotate

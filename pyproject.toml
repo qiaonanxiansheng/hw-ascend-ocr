@@ -8,11 +8,11 @@ version = "3.0.0"
 description = "Native, high-cohesion OCR engine for Huawei Ascend (NPU)."
 readme = "README.md"
 requires-python = ">=3.8"
-license = "MIT"
+license = {file = "LICENSE"}
 authors = [
-    {name = "Yuntu AI"},
+    {name = "ascend-ocr contributors"},
 ]
-keywords = ["ocr", "ascend", "npu", "paddleocr", "huawei"]
+keywords = ["ocr", "ascend", "npu", "paddleocr", "huawei", "layout-analysis"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -25,16 +25,23 @@ classifiers = [
 ]
 dependencies = [
     "numpy>=1.21.0",
-    "opencv-python>=4.5.0",
+    "opencv-python-headless>=4.5.0",
     "pyclipper>=1.2.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+api = [
     "fastapi>=0.100.0",
     "uvicorn>=0.20.0",
     "python-multipart>=0.0.6",
 ]
-
-[project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
     "pytest-cov",
 ]
 
+[project.urls]
+Homepage = "https://github.com/your-org/ascend-ocr"
+Repository = "https://github.com/your-org/ascend-ocr"
+Issues = "https://github.com/your-org/ascend-ocr/issues"

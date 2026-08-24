@@ -22,13 +22,7 @@
 ## 安装
 
 ```bash
-pip install .
-```
-
-如果需要使用 REST API 服务：
-
-```bash
-pip install ".[api]"
+pip install -r requirements.txt
 ```
 
 > `acl` 包由 Ascend CANN Toolkit 在运行时提供，不要通过 pip 安装。
@@ -405,34 +399,91 @@ curl -X POST \
 
 ## Docker 部署
 
-### 构建镜像
+### 第一步：准备模型文件
+
+模型按芯片类型存放在 `models/` 目录下，程序会根据 `config.yaml` 中的 `chip` 字段自动加载对应目录的模型：
+
+```
+models/
+├── 310/                  ← chip: "310" 时加载这个目录
+│   ├── det.om
+│   ├── rec.om
+│   ├── rotate.om
+│   ├── PP-DocLayoutV3.om
+│   └── table.om
+├── 310P/                 ← chip: "310P" 时加载这个目录
+│   └── ...
+└── 910B3/                ← chip: "910B3" 时加载这个目录
+    └── ...
+```
+
+将你转换好的 OM 模型放到对应的芯片目录下即可。
+
+### 第二步：修改配置文件
+
+编辑 `config.yaml`，修改 `chip` 字段为你的芯片型号：
+
+```yaml
+chip: "310"      # 改成你的芯片型号：310 / 310P / 910B3 等
+device_id: 0     # NPU 设备 ID
+```
+
+程序会自动拼接模型路径：`models/{chip}/det.om`、`models/{chip}/rec.om` 等。如果你的模型文件名不同，可以手动指定：
+
+```yaml
+chip: "310"
+det_model: "models/310/det.om"       # 手动指定，覆盖自动拼接
+rec_model: "models/310/rec.om"
+table_model: "models/310/table.om"
+```
+
+### 第三步：构建镜像
+
+**1. 下载 Ascend CANN 基础镜像**
+
+前往 [Ascend 官网资源页面](https://www.hiascend.com/developer/download/community/result?cann=8.0.0) 下载对应芯片的 CANN 镜像。
+
+根据你的芯片型号和 Python 版本选择合适的镜像，例如：
+- 310 芯片：`cann:8.0.0-ubuntu22.04-py3.11`
+- 310P 芯片：`cann:8.0.0-ubuntu22.04-py3.11`
+- 910B3 芯片：`cann:8.0.0-ubuntu22.04-py3.11`
+
+**2. 构建 Docker 镜像**
 
 ```bash
+# 使用默认基础镜像（需要本地已有）
 docker build -t ascend-ocr .
+
+# 或指定从 Ascend 官网下载的基础镜像
+docker build \
+  --build-arg BASE_IMAGE=ascend-cann:8.0.0-ubuntu22.04-py3.11 \
+  -t ascend-ocr .
 ```
 
-使用其他 CANN 基础镜像：
+> 将 `ascend-cann:8.0.0-ubuntu22.04-py3.11` 替换为你从 Ascend 官网下载的实际镜像名称。
 
-```bash
-docker build --build-arg BASE_IMAGE=your-registry/cann:8.0.0-ubuntu22.04-py3.11 -t ascend-ocr .
-```
-
-### 启动容器
+### 第四步：启动容器
 
 ```bash
 docker run -d --restart unless-stopped \
     --device /dev/davinci0 \
     -p 13502:13502 \
     -v /opt/ascend-ocr/models:/workspace/models \
-    -v /opt/ascend-ocr/data:/workspace/data \
+    -v /opt/ascend-ocr/config.yaml:/workspace/config.yaml \
     -e LD_LIBRARY_PATH=/usr/local/Ascend/driver/lib64:/usr/local/Ascend/driver/lib64/driver:/usr/local/Ascend/driver/lib64/common \
     --shm-size=8g \
     ascend-ocr
 ```
 
-容器启动后监听 `13502` 端口。
+参数说明：
+- `--device /dev/davinci0`：挂载 NPU 设备，多个设备改为 `/dev/davinci1` 等
+- `-v .../models:/workspace/models`：挂载模型目录，方便更换模型不用重建镜像
+- `-v .../config.yaml:/workspace/config.yaml`：挂载配置文件，修改芯片型号后重启即可生效
+- `--shm-size=8g`：共享内存，OCR 推理需要较大内存
 
-### 测试接口
+容器启动后监听 `13502` 端口，日志输出到 stdout。
+
+### 第五步：测试接口
 
 ```bash
 # 全文识别
@@ -441,13 +492,13 @@ curl -X POST \
   -F "file=@test.jpg" \
   http://localhost:13502/api/ocr
 
-# 版面分析
+# 版面分析（表格区域自动生成 HTML）
 curl -X POST \
   -F "file_id=test1" \
   -F "file=@test.jpg" \
   http://localhost:13502/api/layout-ocr
 
-# 表格识别
+# 表格结构识别（独立接口，无需版面模型）
 curl -X POST \
   -F "file_id=test1" \
   -F "file=@table.jpg" \
@@ -456,14 +507,23 @@ curl -X POST \
 
 ## 模型转换
 
-将训练好的模型部署到 Ascend NPU 需要转换为 OM 格式。转换流程：`x.y（原始模型）` → `x.onnx` → `x.om`。
+所有模型都是开源模型，转换流程：`原始模型` → `ONNX` → `OM`。
 
-> **重要：** 转换前请确认你的 NPU 芯片型号（310 / 310P / 910B3 等），`--soc_version` 参数必须匹配。
+**核心步骤：**
+1. 从开源社区下载原始模型（或自己训练）
+2. 转成 ONNX 格式
+3. 使用华为 `atc` 工具将 ONNX 转成 OM 格式
+
+**切换芯片型号只需改一个参数：** 将下面所有命令中的 `--soc_version=Ascend310` 改成你的芯片型号即可，例如 `Ascend310P`、`Ascend910B3`。
+
+> **注意：** `atc` 工具由 Ascend CANN Toolkit 提供，需要在安装了 CANN 的环境中执行（或在 Ascend 官方 Docker 镜像中执行）。
 
 <details>
 <summary><b>1. 大角度分类模型</b></summary>
 
-原始模型：开源角度分类模型（rotate.onnx）
+**用途：** 识别图片旋转角度（0°/90°/180°/270°），自动转正
+
+**ONNX 模型来源：** 开源角度分类模型，输入 `[1,3,512,512]`
 
 ```bash
 atc --model=./rotate.onnx \
@@ -474,62 +534,75 @@ atc --model=./rotate.onnx \
     --precision_mode=allow_fp32_to_fp16
 ```
 
+输出：`rotate.om`
+
 </details>
 
 <details>
 <summary><b>2. 文字检测模型</b></summary>
 
-原始模型：PaddleOCR PP-OCRv6_small_det
+**用途：** 检测图片中的文字区域（DBNet）
+
+**ONNX 模型来源：** PaddleOCR `PP-OCRv6_small_det`，从 [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) 下载
 
 ```bash
-# 1. PaddleOCR → ONNX
+# 第一步：PaddleOCR 模型 → ONNX
+pip install paddlex
 paddlex --paddle2onnx \
     --paddle_model_dir ./PP-OCRv6_small_det_infer \
     --onnx_model_dir ./models/det \
     --opset_version 11
 
-# 2. ONNX → OM
+# 第二步：ONNX → OM
 atc --model=./v6_small_det.onnx \
     --framework=5 \
-    --output=./om/v6_small_det \
+    --output=det \
     --input_shape="x:1,3,960,960" \
     --soc_version=Ascend310 \
     --precision_mode=allow_fp32_to_fp16
 ```
 
-> **注意：** `--precision_mode=allow_fp32_to_fp16` 参数很重要，不加在某些设备上会导致检测不出文本框或误差极大。
+输出：`det.om`
+
+> **重要：** `--precision_mode=allow_fp32_to_fp16` 必须加，否则在某些设备上会导致检测不出文本框或误差极大。
 >
-> 转出的模型是静态输入尺寸，最长边固定 960。静态模型速度更快，建议根据业务场景定死此值，常见：960、1600 等。
+> `--input_shape` 中的 960 是静态输入尺寸，建议根据业务场景定死。静态模型比动态模型速度快，常见值：960、1600。
 
 </details>
 
 <details>
 <summary><b>3. 文字识别模型</b></summary>
 
-原始模型：PaddleOCR PP-OCRv6_small_rec
+**用途：** 识别裁剪后的文字图片（SVTR + CTC）
+
+**ONNX 模型来源：** PaddleOCR `PP-OCRv6_small_rec`，从 [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) 下载
 
 ```bash
-# 1. PaddleOCR → ONNX
+# 第一步：PaddleOCR 模型 → ONNX
 paddlex --paddle2onnx \
     --paddle_model_dir ./PP-OCRv6_small_rec_infer \
     --onnx_model_dir ./models/rec \
     --opset_version 11
 
-# 2. ONNX → OM
+# 第二步：ONNX → OM
 atc --model=./v6_small_rec.onnx \
     --framework=5 \
-    --output=./om/v6_small_rec \
+    --output=rec \
     --input_shape="x:1,3,48,960" \
     --soc_version=Ascend310 \
     --precision_mode=allow_fp32_to_fp16
 ```
 
+输出：`rec.om`
+
 </details>
 
 <details>
-<summary><b>4. 版面分析模型</b></summary>
+<summary><b>4. 版面分析模型（可选）</b></summary>
 
-原始模型：PaddleOCR PP-DocLayoutV3
+**用途：** 检测文档版面区域（文字、标题、表格、图片等），表格区域自动生成 HTML
+
+**ONNX 模型来源：** PaddleOCR `PP-DocLayoutV3`，从 [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) 下载
 
 ```bash
 atc --model=PP-DocLayoutV3.onnx \
@@ -538,16 +611,21 @@ atc --model=PP-DocLayoutV3.onnx \
     --input_format=ND \
     --input_shape="im_shape:1,2;image:1,3,800,800;scale_factor:1,2" \
     --soc_version=Ascend310 \
-    --input_format=ND \
     --precision_mode=allow_fp32_to_fp16
 ```
+
+输出：`PP-DocLayoutV3.om`
+
+> 不需要版面分析功能可以不转换此模型。
 
 </details>
 
 <details>
-<summary><b>5. 表格识别模型</b></summary>
+<summary><b>5. 表格识别模型（可选）</b></summary>
 
-原始模型：YOLO11 训练的表格/单元格检测模型（table.onnx）
+**用途：** 检测表格区域和单元格，配合 OCR 生成结构化 HTML 表格
+
+**ONNX 模型来源：** 使用 YOLO11 自行训练的表格/单元格检测模型，2 个类别：`table`（表格区域）和 `cell`（单元格）
 
 ```bash
 atc --model=table.onnx \
@@ -559,10 +637,24 @@ atc --model=table.onnx \
     --precision_mode=allow_fp32_to_fp16
 ```
 
+输出：`table.om`
+
 > 模型输出格式：`[1, 6, 8400]`，其中 6 = `[cx, cy, w, h, table_score, cell_score]`。
-> 训练时使用 2 个类别：`table`（表格区域）和 `cell`（单元格）。
+>
+> 不需要表格识别功能可以不转换此模型。
 
 </details>
+
+### 转换完成后
+
+将所有 `.om` 文件放到对应的芯片目录下：
+
+```bash
+mkdir -p models/310
+mv det.om rec.om rotate.om PP-DocLayoutV3.om table.om models/310/
+```
+
+然后修改 `config.yaml` 中的 `chip` 字段为你的芯片型号即可。
 
 ## 加密模型
 

@@ -1,16 +1,16 @@
-FROM swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:8.1.rc1-310p-ubuntu22.04-py3.11
+ARG BASE_IMAGE=swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:8.1.rc1-310p-ubuntu22.04-py3.11
+FROM ${BASE_IMAGE}
 
 # pip 使用清华源
 RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 
 # Install Python dependencies
 COPY requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt && rm /tmp/requirements.txt
 
-# Copy project and install package (--no-deps: deps already installed above)
+# Copy project
 WORKDIR /workspace
 COPY . /workspace
-RUN pip install --no-cache-dir --no-deps -e .
 
 # Load CANN environment in interactive shells
 RUN echo "source /usr/local/Ascend/ascend-toolkit/set_env.sh" >> /root/.bashrc

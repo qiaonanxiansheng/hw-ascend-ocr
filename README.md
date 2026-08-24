@@ -444,42 +444,68 @@ table_model: "models/310/table.om"
 前往 [Ascend 官网资源页面](https://www.hiascend.com/developer/download/community/result?cann=8.0.0) 下载对应芯片的 CANN 镜像。
 
 根据你的芯片型号和 Python 版本选择合适的镜像，例如：
-- 310 芯片：`cann:8.0.0-ubuntu22.04-py3.11`
-- 310P 芯片：`cann:8.0.0-ubuntu22.04-py3.11`
-- 910B3 芯片：`cann:8.0.0-ubuntu22.04-py3.11`
+- 310 芯片：`swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:8.1.rc1-310p-ubuntu22.04-py3.11`
+- 310P 芯片：`swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:8.1.rc1-310p-ubuntu22.04-py3.11`
+- 910B3 芯片：`cswr.cn-south-1.myhuaweicloud.com/ascendhub/cann:8.1.rc1-910b-ubuntu22.04-py3.11`
 
 **2. 构建 Docker 镜像**
 
 ```bash
 # 使用默认基础镜像（需要本地已有）
-docker build -t ascend-ocr .
+docker build -t ascend-ocr:310p .
 
 # 或指定从 Ascend 官网下载的基础镜像
 docker build \
-  --build-arg BASE_IMAGE=ascend-cann:8.0.0-ubuntu22.04-py3.11 \
-  -t ascend-ocr .
+  --build-arg BASE_IMAGE=swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:8.1.rc1-310p-ubuntu22.04-py3.11 \
+  -t ascend-ocr:310p .
 ```
 
-> 将 `ascend-cann:8.0.0-ubuntu22.04-py3.11` 替换为你从 Ascend 官网下载的实际镜像名称。
+> 将基础镜像地址替换为你从 Ascend 官网下载的实际镜像，标签中的 `310p` 改成你的芯片型号。
 
 ### 第四步：启动容器
 
+以物理机 NPU 4 在容器中映射为 NPU 0 为例：
+
 ```bash
 docker run -d --restart unless-stopped \
-    --device /dev/davinci0 \
+    --name ascend-ocr \
     -p 13502:13502 \
-    -v /opt/ascend-ocr/models:/workspace/models \
+    --device=/dev/davinci4:/dev/davinci0 \
+    --device=/dev/davinci_manager \
+    --device=/dev/devmm_svm \
+    --device=/dev/hisi_hdc \
+    -v /usr/local/Ascend/driver:/usr/local/Ascend/driver:ro \
+    -v /usr/local/Ascend/driver/lib64:/usr/local/Ascend/driver/lib64:ro \
+    -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info:ro \
+    -v /usr/local/Ascend/add-ons:/usr/local/Ascend/add-ons:ro \
+    -v /etc/ascend_install.info:/etc/ascend_install.info:ro \
+    -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi:ro \
+    -v /usr/local/dcmi:/usr/local/dcmi:ro \
     -v /opt/ascend-ocr/config.yaml:/workspace/config.yaml \
+    -v /opt/ascend-ocr/models:/workspace/models \
     -e LD_LIBRARY_PATH=/usr/local/Ascend/driver/lib64:/usr/local/Ascend/driver/lib64/driver:/usr/local/Ascend/driver/lib64/common \
     --shm-size=8g \
-    ascend-ocr
+    ascend-ocr:310p
 ```
 
-参数说明：
-- `--device /dev/davinci0`：挂载 NPU 设备，多个设备改为 `/dev/davinci1` 等
-- `-v .../models:/workspace/models`：挂载模型目录，方便更换模型不用重建镜像
-- `-v .../config.yaml:/workspace/config.yaml`：挂载配置文件，修改芯片型号后重启即可生效
-- `--shm-size=8g`：共享内存，OCR 推理需要较大内存
+**参数说明：**
+
+| 参数 | 说明 |
+|------|------|
+| `--device=/dev/davinci4:/dev/davinci0` | 将物理机 NPU 4 映射为容器内 NPU 0，按实际情况修改 |
+| `--device=/dev/davinci_manager` | NPU 管理设备，必须挂载 |
+| `--device=/dev/devmm_svm` | SVM 设备，必须挂载 |
+| `--device=/dev/hisi_hdc` | HDC 设备，必须挂载 |
+| `-v .../driver:ro` | 挂载 Ascend 驱动目录（只读） |
+| `-v .../add-ons:ro` | 挂载 Ascend 插件目录（只读） |
+| `-v .../ascend_install.info:ro` | 挂载安装信息（只读） |
+| `-v .../npu-smi:ro` | 挂载 npu-smi 工具（只读） |
+| `-v .../dcmi:ro` | 挂载 DCMI（只读） |
+| `-v .../config.yaml` | 挂载配置文件，修改芯片型号后重启即生效 |
+| `-v .../models` | 挂载模型目录，更换模型不用重建镜像 |
+| `--shm-size=8g` | 共享内存，OCR 推理需要较大内存 |
+
+> **NPU 设备映射：** `--device=/dev/davinci4:/dev/davinci0` 表示物理机的第 4 号 NPU 在容器里是第 0 个。如果你只有一块 NPU 且是第 0 号，写 `--device=/dev/davinci0` 即可。
 
 容器启动后监听 `13502` 端口，日志输出到 stdout。
 
@@ -489,25 +515,27 @@ docker run -d --restart unless-stopped \
 # 全文识别
 curl -X POST \
   -F "file_id=test1" \
-  -F "file=@test.jpg" \
+  -F "file=@docs/test.tif" \
   http://localhost:13502/api/ocr
 
 # 版面分析（表格区域自动生成 HTML）
 curl -X POST \
   -F "file_id=test1" \
-  -F "file=@test.jpg" \
+  -F "file=@docs/test.tif" \
   http://localhost:13502/api/layout-ocr
 
 # 表格结构识别（独立接口，无需版面模型）
 curl -X POST \
   -F "file_id=test1" \
-  -F "file=@table.jpg" \
+  -F "file=@docs/test.tif" \
   http://localhost:13502/api/table-ocr
 ```
 
 ## 模型转换
 
 所有模型都是开源模型，转换流程：`原始模型` → `ONNX` → `OM`。
+
+ONNX 模型可从 [ModelScope](https://modelscope.cn) 下载。
 
 **核心步骤：**
 1. 从开源社区下载原始模型（或自己训练）
@@ -557,7 +585,7 @@ paddlex --paddle2onnx \
 atc --model=./v6_small_det.onnx \
     --framework=5 \
     --output=det \
-    --input_shape="x:1,3,960,960" \
+    --input_shape="x:1,3,960,672" \
     --soc_version=Ascend310 \
     --precision_mode=allow_fp32_to_fp16
 ```

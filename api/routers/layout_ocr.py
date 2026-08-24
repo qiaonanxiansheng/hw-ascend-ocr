@@ -89,6 +89,7 @@ async def layout_ocr(
                 bbox=list(region.bbox),
                 lines=lines,
                 text=full_text,
+                html=region.html or None,
             )
         )
 
@@ -108,9 +109,10 @@ async def layout_ocr(
         vis_b64 = base64.b64encode(buf).decode("ascii")
 
     elapsed = (time.perf_counter() - t0) * 1000
+    table_count = sum(1 for r in regions if r.class_name == "table" and r.html)
     logger.info(
-        "Layout OCR 完成, file_id=%s, regions=%d, lines=%d, rotate=%d, 耗时=%.1fms",
-        file_id, len(regions), total_lines, angle, elapsed,
+        "Layout OCR 完成, file_id=%s, regions=%d, lines=%d, tables=%d, rotate=%d, 耗时=%.1fms",
+        file_id, len(regions), total_lines, table_count, angle, elapsed,
     )
 
     return LayoutOCRResponse(

@@ -26,8 +26,10 @@ from ascend_ocr.exceptions import (
 )
 from api.routers import ocr as ocr_router_module
 from api.routers import layout_ocr as layout_ocr_router_module
+from api.routers import table_ocr as table_ocr_router_module
 from api.routers.ocr import router as ocr_router
 from api.routers.layout_ocr import router as layout_ocr_router
+from api.routers.table_ocr import router as table_ocr_router
 from api.schemas import OCRResponse
 
 logger = logging.getLogger("api")
@@ -42,11 +44,13 @@ async def lifespan(app: FastAPI):
     engine = AscendOCR(config=config)
     ocr_router_module.engine = engine
     layout_ocr_router_module.engine = engine
-    logger.info("OCR engine ready, layout_model=%s", config.layout_model)
+    table_ocr_router_module.engine = engine
+    logger.info("OCR engine ready, layout_model=%s, table_model=%s", config.layout_model, config.table_model)
     yield
     engine.release()
     ocr_router_module.engine = None
     layout_ocr_router_module.engine = None
+    table_ocr_router_module.engine = None
     logger.info("OCR engine released")
 
 
@@ -54,6 +58,7 @@ app = FastAPI(title="Ascend OCR API", lifespan=lifespan)
 
 app.include_router(ocr_router)
 app.include_router(layout_ocr_router)
+app.include_router(table_ocr_router)
 
 
 @app.exception_handler(AscendOCRError)

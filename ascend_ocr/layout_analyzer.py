@@ -62,6 +62,7 @@ class LayoutRegion:
     class_name: str
     score: float
     bbox: Tuple[int, int, int, int]  # (x1, y1, x2, y2)
+    html: str = ""  # HTML content for table regions
 
     def __repr__(self) -> str:
         return (

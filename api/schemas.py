@@ -34,6 +34,7 @@ class LayoutRegionResponse(BaseModel):
     bbox: List[int]  # [x1, y1, x2, y2]
     lines: List[OCRLineResponse]
     text: str
+    html: Optional[str] = None  # HTML content for table regions
 
 
 class LayoutOCRData(BaseModel):
@@ -48,3 +49,40 @@ class LayoutOCRResponse(BaseModel):
     code: int
     message: str
     data: Optional[LayoutOCRData] = None
+
+
+class TableCellResponse(BaseModel):
+    index: int
+    bbox: List[int]  # [x1, y1, x2, y2]
+    score: float
+    rowstart: int
+    rowend: int
+    colstart: int
+    colend: int
+    rowspan: int
+    colspan: int
+    lines: List[OCRLineResponse]
+    text: str
+
+
+class TableRegionResponse(BaseModel):
+    index: int
+    bbox: List[int]  # [x1, y1, x2, y2]
+    rows: int
+    cols: int
+    html: str
+    cells: List[TableCellResponse]
+
+
+class TableOCRData(BaseModel):
+    file_id: str
+    rotate: int
+    tables: List[TableRegionResponse]
+    outside_text: List[OCRLineResponse]
+    visualization: Optional[str] = None
+
+
+class TableOCRResponse(BaseModel):
+    code: int
+    message: str
+    data: Optional[TableOCRData] = None

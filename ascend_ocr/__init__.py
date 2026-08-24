@@ -29,10 +29,11 @@ Example
 from .ocr import AscendOCR, OCRResult
 from .angle_classifier import AngleClassifier
 from .layout_analyzer import LayoutAnalyzer, LayoutRegion
+from .table_recognizer import TableRecognizer, TableStructure, TableCell
 from .text_detector import TextDetector
 from .text_recognizer import TextRecognizer
 from .model import AscendModel
-from .config import OCRConfig, DetConfig, RecConfig, RotateConfig, load_config
+from .config import OCRConfig, DetConfig, RecConfig, RotateConfig, TableConfig, load_config
 
 __version__ = "3.0.0"
 __all__ = [
@@ -41,6 +42,9 @@ __all__ = [
     "AngleClassifier",
     "LayoutAnalyzer",
     "LayoutRegion",
+    "TableRecognizer",
+    "TableStructure",
+    "TableCell",
     "TextDetector",
     "TextRecognizer",
     "AscendModel",
@@ -48,5 +52,6 @@ __all__ = [
     "DetConfig",
     "RecConfig",
     "RotateConfig",
+    "TableConfig",
     "load_config",
 ]

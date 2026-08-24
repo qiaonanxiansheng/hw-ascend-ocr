@@ -19,6 +19,17 @@ from .config import OCRConfig
 from .exceptions import AscendOCRError
 from .image_utils import draw_boxes, load_image
 from .layout_analyzer import LayoutAnalyzer, LayoutRegion
+from .table_recognizer import (
+    TableRecognizer,
+    TableStructure,
+    TableCell,
+    DetectedBox,
+    assign_cells_to_tables,
+    assign_text_to_cells,
+    find_cols,
+    find_rows,
+    generate_html,
+)
 from .text_detector import TextDetector
 from .text_recognizer import TextRecognizer
 
@@ -184,6 +195,7 @@ class AscendOCR:
         self._recognizer: Optional[TextRecognizer] = None
         self._classifier: Optional[AngleClassifier] = None
         self._layout_analyzer: Optional[LayoutAnalyzer] = None
+        self._table_recognizer: Optional[TableRecognizer] = None
 
     def _validate_config(self) -> None:
         if self.config.det_model is None:
@@ -239,6 +251,17 @@ class AscendOCR:
                 decrypt_callback=self.config.decrypt_callback,
             )
         return self._layout_analyzer
+
+    @property
+    def table_recognizer(self) -> Optional[TableRecognizer]:
+        if self._table_recognizer is None and self.config.table_model:
+            self._table_recognizer = TableRecognizer(
+                self.config.table_model,
+                cfg=self.config.table,
+                device_id=self.config.device_id,
+                decrypt_callback=self.config.decrypt_callback,
+            )
+        return self._table_recognizer
 
     # ------------------------------------------------------------------
     # 核心 OCR 管线（不含角度分类，零额外开销）
@@ -395,14 +418,15 @@ class AscendOCR:
         int,
     ]:
         """
-        版面分析 + 全图 OCR + 文本聚类。
+        版面分析 + 全图 OCR + 文本聚类 + 表格结构识别。
 
         流程：
         1. 大角度分类 → 转正整图（一次性）
         2. 版面分析（在转正后的图上）
         3. 全图文字检测 + 识别（一次性，不按区域裁剪）
         4. 文本聚类：将文本行分配到对应的版面元素
-        5. 坐标映射回原图
+        5. 表格区域：裁剪 → 表格模型检测单元格 → 分配文字 → 行列聚类 → 生成 HTML
+        6. 坐标映射回原图
 
         Args:
             image: Local path, HTTP(S) URL, raw bytes, or numpy array.
@@ -463,16 +487,106 @@ class AscendOCR:
         logger.info("[全图OCR] 检测到 %d 行文字, 耗时: %.1fms", len(all_results), t_ocr * 1000)
 
         # 4. 文本聚类：将文本行分配到版面区域（在转正坐标系中进行）
+        #    表格区域的文本行也会被聚类到这里，后面会被表格结构替代
         clusters = _cluster_text_to_regions(all_results, regions)
 
-        # 5. 构建 region_ocr_results
+        # 5. 表格区域：裁剪 → 表格模型 → 单元格检测 → 文字分配 → 行列聚类 → HTML
+        table_indices = [ri for ri, r in enumerate(regions) if r.class_name == "table"]
+        if table_indices and self.table_recognizer is not None:
+            _ = self.table_recognizer
+            cell_overlap = self.config.table.text_cell_overlap
+            img_h, img_w = img.shape[:2]
+
+            for ri in table_indices:
+                region = regions[ri]
+                rx1, ry1, rx2, ry2 = region.bbox
+
+                # 裁剪表格区域
+                cx1 = max(0, rx1)
+                cy1 = max(0, ry1)
+                cx2 = min(img_w, rx2)
+                cy2 = min(img_h, ry2)
+                crop = img[cy1:cy2, cx1:cx2]
+                if crop.size == 0:
+                    continue
+
+                t_table_start = time.perf_counter()
+
+                # 表格模型检测（只取单元格，忽略表格区域检测）
+                cells, _ = self.table_recognizer.detect(crop)
+
+                if cells:
+                    # 将单元格坐标从裁剪空间映射到全图空间
+                    for cell in cells:
+                        bx1, by1, bx2, by2 = cell.bbox
+                        cell.bbox = (bx1 + cx1, by1 + cy1, bx2 + cx1, by2 + cy1)
+
+                    # 筛选落在表格区域内的 OCR 文本行
+                    table_results = [
+                        r for r in all_results
+                        if _box_overlap_ratio(
+                            *self._result_aabb(r), rx1, ry1, rx2, ry2,
+                        ) > 0.3
+                    ]
+
+                    # 将文字分配到单元格
+                    outside = assign_text_to_cells(
+                        cells, table_results, overlap_threshold=cell_overlap,
+                    )
+
+                    # 行列聚类
+                    min_h = min(c.height for c in cells)
+                    min_w = min(c.width for c in cells)
+                    rows = find_rows(cells, min_h * 0.5)
+                    cols = find_cols(cells, min_w * 0.5)
+
+                    # 按阅读顺序排序
+                    cells.sort(key=lambda c: (c.rowstart, c.colstart))
+
+                    # 生成 HTML
+                    table_bbox = (
+                        min(c.bbox[0] for c in cells),
+                        min(c.bbox[1] for c in cells),
+                        max(c.bbox[2] for c in cells),
+                        max(c.bbox[3] for c in cells),
+                    )
+                    table = TableStructure(
+                        bbox=table_bbox,
+                        rows=len(rows),
+                        cols=len(cols),
+                        cells=cells,
+                    )
+                    region.html = generate_html(table)
+
+                    # 将表格内已分配的文本行从 clusters 中移除
+                    assigned_ids = set()
+                    for cell in cells:
+                        for line in cell.lines:
+                            assigned_ids.add(id(line))
+                    if ri in clusters:
+                        clusters[ri] = [
+                            r for r in clusters[ri] if id(r) not in assigned_ids
+                        ]
+
+                    t_table = time.perf_counter() - t_table_start
+                    logger.info(
+                        "[表格识别] region=%d, cells=%d, %dx%d, 耗时=%.1fms",
+                        ri + 1, len(cells), len(rows), len(cols), t_table * 1000,
+                    )
+                else:
+                    logger.info("[表格识别] region=%d, 未检测到单元格", ri + 1)
+
+        elif table_indices:
+            logger.warning("[表格识别] 检测到 %d 个表格区域，但表格模型未配置", len(table_indices))
+
+        # 6. 构建 region_ocr_results
         region_ocr_results: List[Tuple[LayoutRegion, List[OCRResult]]] = []
         for ri, region in enumerate(regions):
             region_lines = clusters.get(ri, [])
             if region_lines:
                 region_ocr_results.append((region, region_lines))
 
-        # 6. 将所有坐标映射回原图坐标系
+        # 7. 将所有坐标映射回原图坐标系
         if angle != 0:
             for r in all_results:
                 _rotate_pts_back(r.box, angle, orig_h, orig_w)
@@ -497,6 +611,172 @@ class AscendOCR:
 
         return regions, region_ocr_results, clusters, angle
 
+    @staticmethod
+    def _result_aabb(r: "OCRResult") -> Tuple[float, float, float, float]:
+        """Get axis-aligned bounding box of an OCRResult (x1, y1, x2, y2)."""
+        pts = r.box.reshape(-1, 2)
+        return (float(pts[:, 0].min()), float(pts[:, 1].min()),
+                float(pts[:, 0].max()), float(pts[:, 1].max()))
+
+    # ------------------------------------------------------------------
+    # 表格识别 + OCR + 结构分析
+    # ------------------------------------------------------------------
+
+    def table_ocr(
+        self,
+        image: Union[str, bytes, np.ndarray],
+        use_rotate: Optional[bool] = None,
+    ) -> Tuple[List[TableStructure], List["OCRResult"], int]:
+        """
+        Table structure recognition + OCR.
+
+        Pipeline (no layout model needed):
+        1. Large-angle classification → rotate image
+        2. Table model → detect table regions + cells
+        3. Whole-image OCR → all text lines
+        4. Assign cells to table regions
+        5. For each table: assign text → row/col clustering → HTML
+
+        Args:
+            image: Local path, HTTP(S) URL, raw bytes, or numpy array.
+            use_rotate: Whether to classify and rotate. None uses config default.
+
+        Returns:
+            (tables, outside_text, angle) where:
+            - tables: List of TableStructure objects with cells, HTML.
+            - outside_text: OCR results not assigned to any cell.
+            - angle: Detected rotation angle.
+        """
+        if self.table_recognizer is None:
+            raise AscendOCRError("table_model is not configured")
+
+        if use_rotate is None:
+            use_rotate = self.config.use_rotate
+
+        orig_img = load_image(image)
+        orig_h, orig_w = orig_img.shape[:2]
+        logger.info("Table OCR 开始, 输入图片: %s", orig_img.shape)
+
+        # Pre-load models
+        _ = self.detector
+        _ = self.recognizer
+        _ = self.table_recognizer
+        if use_rotate:
+            _ = self.classifier
+
+        t_total = time.perf_counter()
+
+        # 1. Large-angle classification → rotate
+        angle = 0
+        img = orig_img
+        if use_rotate:
+            rotator = self.classifier
+            if rotator is not None:
+                t0 = time.perf_counter()
+                img, angle, rotate_conf = rotator.rotate_to_upright(img)
+                t_rotate = time.perf_counter() - t0
+                logger.info("[角度分类] 角度: %d°, 置信度: %.3f, 耗时: %.1fms", angle, rotate_conf, t_rotate * 1000)
+
+        # 2. Table model → detect table regions + cells
+        t0 = time.perf_counter()
+        cells, table_boxes = self.table_recognizer.detect(img)
+        t_table = time.perf_counter() - t0
+        logger.info("[表格检测] %d 个单元格, %d 个表格区域, 耗时: %.1fms",
+                    len(cells), len(table_boxes), t_table * 1000)
+
+        # 3. Whole-image OCR
+        t0 = time.perf_counter()
+        all_results, t_rec_ms = self._ocr_core(img)
+        t_ocr = time.perf_counter() - t0
+        logger.info("[全图OCR] 检测到 %d 行文字, 耗时: %.1fms", len(all_results), t_ocr * 1000)
+
+        # 4. Assign cells to table regions
+        table_cell_map = assign_cells_to_tables(cells, table_boxes)
+        logger.info("单元格分配到 %d 个表格", len(table_cell_map))
+
+        # 5. For each table: assign text → row/col clustering → HTML
+        tables: List[TableStructure] = []
+        cell_overlap_threshold = self.config.table.text_cell_overlap
+
+        for ti in sorted(table_cell_map.keys()):
+            table_cells = table_cell_map[ti]
+            if not table_cells:
+                continue
+
+            logger.info("[表格 %d] %d 个单元格", ti + 1, len(table_cells))
+
+            # Compute adaptive thresholds
+            min_height = min(c.height for c in table_cells)
+            min_width = min(c.width for c in table_cells)
+            height_threshold = min_height * 0.5
+            width_threshold = min_width * 0.5
+
+            # Assign OCR text to cells (only unassigned lines)
+            outside_text = assign_text_to_cells(
+                table_cells, all_results, overlap_threshold=cell_overlap_threshold,
+            )
+
+            # Row/column clustering
+            rows = find_rows(table_cells, height_threshold)
+            cols = find_cols(table_cells, width_threshold)
+            logger.info("[表格 %d] %d 行 x %d 列", ti + 1, len(rows), len(cols))
+
+            # Compute table bounding box
+            x1 = min(c.bbox[0] for c in table_cells)
+            y1 = min(c.bbox[1] for c in table_cells)
+            x2 = max(c.bbox[2] for c in table_cells)
+            y2 = max(c.bbox[3] for c in table_cells)
+
+            # Sort cells by reading order for HTML
+            table_cells.sort(key=lambda c: (c.rowstart, c.colstart))
+
+            table = TableStructure(
+                bbox=(x1, y1, x2, y2),
+                rows=len(rows),
+                cols=len(cols),
+                cells=table_cells,
+            )
+            table.html = generate_html(table)
+            tables.append(table)
+
+        # Collect all unassigned text as outside_text
+        assigned_ids = set()
+        for table in tables:
+            for cell in table.cells:
+                for line in cell.lines:
+                    assigned_ids.add(id(line))
+        outside_text = [r for r in all_results if id(r) not in assigned_ids]
+
+        # Map coordinates back to original image if rotated
+        if angle != 0:
+            for r in all_results:
+                _rotate_pts_back(r.box, angle, orig_h, orig_w)
+            for table in tables:
+                x1, y1, x2, y2 = table.bbox
+                pts = np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.float32)
+                _rotate_pts_back(pts, angle, orig_h, orig_w)
+                table.bbox = (
+                    int(pts[:, 0].min()), int(pts[:, 1].min()),
+                    int(pts[:, 0].max()), int(pts[:, 1].max()),
+                )
+                for cell in table.cells:
+                    cx1, cy1, cx2, cy2 = cell.bbox
+                    pts = np.array([[cx1, cy1], [cx2, cy1], [cx2, cy2], [cx1, cy2]], dtype=np.float32)
+                    _rotate_pts_back(pts, angle, orig_h, orig_w)
+                    cell.bbox = (
+                        int(pts[:, 0].min()), int(pts[:, 1].min()),
+                        int(pts[:, 0].max()), int(pts[:, 1].max()),
+                    )
+
+        t_total_elapsed = time.perf_counter() - t_total
+        total_cells = sum(len(t.cells) for t in tables)
+        logger.info(
+            "Table OCR 完成: %d tables, %d cells, outside=%d lines, 总耗时: %.1fms",
+            len(tables), total_cells, len(outside_text), t_total_elapsed * 1000,
+        )
+
+        return tables, outside_text, angle
+
     # ------------------------------------------------------------------
     # 资源管理
     # ------------------------------------------------------------------
@@ -515,6 +795,9 @@ class AscendOCR:
         if self._layout_analyzer is not None:
             self._layout_analyzer.release()
             self._layout_analyzer = None
+        if self._table_recognizer is not None:
+            self._table_recognizer.release()
+            self._table_recognizer = None
 
     def __enter__(self):
         return self

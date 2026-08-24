@@ -176,6 +176,31 @@ class RotateConfig:
 
 
 @dataclass
+class TableConfig:
+    """Table cell detection configuration (YOLO-based)."""
+
+    # Input size expected by the table model (H, W).
+    input_size: int = 640
+
+    # Confidence threshold for cell detections.
+    # Model outputs are already probabilities; background detections have
+    # max(class_scores) ~0.5, real detections ~0.7+. Use 0.6 as default.
+    score_threshold: float = 0.6
+
+    # NMS IoU threshold for suppressing overlapping detections.
+    nms_threshold: float = 0.5
+
+    # Maximum number of detections to keep after NMS.
+    max_detections: int = 1000
+
+    # Overlap ratio threshold for assigning text lines to cells.
+    text_cell_overlap: float = 0.5
+
+    # Normalization: only /255, no mean/std subtraction (YOLO convention).
+    scale: float = 1.0 / 255.0
+
+
+@dataclass
 class OCRConfig:
     """Top-level OCR engine configuration."""
 
@@ -184,6 +209,7 @@ class OCRConfig:
     rec_model: Optional[str] = None
     rotate_model: Optional[str] = None
     layout_model: Optional[str] = None
+    table_model: Optional[str] = None
 
     # Character dictionary path for recognition.
     rec_char_dict: Optional[str] = None
@@ -199,6 +225,7 @@ class OCRConfig:
     det: DetConfig = field(default_factory=DetConfig)
     rec: RecConfig = field(default_factory=RecConfig)
     rotate: RotateConfig = field(default_factory=RotateConfig)
+    table: TableConfig = field(default_factory=TableConfig)
 
     # Whether to run large-angle classification (0/90/180/270) and auto-rotate.
     # Can be overridden per-call via the use_rotate parameter.
@@ -240,6 +267,7 @@ def load_config(yaml_path: str, models_root: str = "models") -> OCRConfig:
     det = DetConfig()
     rec = RecConfig()
     rotate = RotateConfig()
+    table = TableConfig()
 
     if "det" in data and data["det"]:
         _apply_dict(det, data["det"])
@@ -247,9 +275,11 @@ def load_config(yaml_path: str, models_root: str = "models") -> OCRConfig:
         _apply_dict(rec, data["rec"])
     if "rotate" in data and data["rotate"]:
         _apply_dict(rotate, data["rotate"])
+    if "table" in data and data["table"]:
+        _apply_dict(table, data["table"])
 
     # Build top-level config
-    cfg = OCRConfig(det=det, rec=rec, rotate=rotate)
+    cfg = OCRConfig(det=det, rec=rec, rotate=rotate, table=table)
 
     # Handle chip-based model paths
     chip = data.get("chip")
@@ -257,6 +287,7 @@ def load_config(yaml_path: str, models_root: str = "models") -> OCRConfig:
     rec_model = data.get("rec_model")
     rotate_model = data.get("rotate_model")
     layout_model = data.get("layout_model")
+    table_model = data.get("table_model")
 
     if chip:
         chip_dir = os.path.join(models_root, chip)
@@ -268,6 +299,8 @@ def load_config(yaml_path: str, models_root: str = "models") -> OCRConfig:
             rotate_model = os.path.join(chip_dir, "rotate.om")
         if not layout_model:
             layout_model = os.path.join(chip_dir, "PP-DocLayoutV3.om")
+        if not table_model:
+            table_model = os.path.join(chip_dir, "table.om")
 
     # Apply top-level fields
     if det_model:
@@ -278,6 +311,8 @@ def load_config(yaml_path: str, models_root: str = "models") -> OCRConfig:
         cfg.rotate_model = rotate_model
     if layout_model:
         cfg.layout_model = layout_model
+    if table_model:
+        cfg.table_model = table_model
     if "rec_char_dict" in data and data["rec_char_dict"]:
         cfg.rec_char_dict = data["rec_char_dict"]
     elif cfg.rec_char_dict is None:

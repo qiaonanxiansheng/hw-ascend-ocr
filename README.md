@@ -405,9 +405,10 @@ curl -X POST \
 
 ## Docker 部署
 
+### 构建镜像
+
 ```bash
 docker build -t ascend-ocr .
-docker run --device /dev/davinci0 -p 13502:13502 ascend-ocr
 ```
 
 使用其他 CANN 基础镜像：
@@ -415,6 +416,153 @@ docker run --device /dev/davinci0 -p 13502:13502 ascend-ocr
 ```bash
 docker build --build-arg BASE_IMAGE=your-registry/cann:8.0.0-ubuntu22.04-py3.11 -t ascend-ocr .
 ```
+
+### 启动容器
+
+```bash
+docker run -d --restart unless-stopped \
+    --device /dev/davinci0 \
+    -p 13502:13502 \
+    -v /opt/ascend-ocr/models:/workspace/models \
+    -v /opt/ascend-ocr/data:/workspace/data \
+    -e LD_LIBRARY_PATH=/usr/local/Ascend/driver/lib64:/usr/local/Ascend/driver/lib64/driver:/usr/local/Ascend/driver/lib64/common \
+    --shm-size=8g \
+    ascend-ocr
+```
+
+容器启动后监听 `13502` 端口。
+
+### 测试接口
+
+```bash
+# 全文识别
+curl -X POST \
+  -F "file_id=test1" \
+  -F "file=@test.jpg" \
+  http://localhost:13502/api/ocr
+
+# 版面分析
+curl -X POST \
+  -F "file_id=test1" \
+  -F "file=@test.jpg" \
+  http://localhost:13502/api/layout-ocr
+
+# 表格识别
+curl -X POST \
+  -F "file_id=test1" \
+  -F "file=@table.jpg" \
+  http://localhost:13502/api/table-ocr
+```
+
+## 模型转换
+
+将训练好的模型部署到 Ascend NPU 需要转换为 OM 格式。转换流程：`x.y（原始模型）` → `x.onnx` → `x.om`。
+
+> **重要：** 转换前请确认你的 NPU 芯片型号（310 / 310P / 910B3 等），`--soc_version` 参数必须匹配。
+
+<details>
+<summary><b>1. 大角度分类模型</b></summary>
+
+原始模型：开源角度分类模型（rotate.onnx）
+
+```bash
+atc --model=./rotate.onnx \
+    --framework=5 \
+    --output=rotate \
+    --input_shape="images:1,3,512,512" \
+    --soc_version=Ascend310 \
+    --precision_mode=allow_fp32_to_fp16
+```
+
+</details>
+
+<details>
+<summary><b>2. 文字检测模型</b></summary>
+
+原始模型：PaddleOCR PP-OCRv6_small_det
+
+```bash
+# 1. PaddleOCR → ONNX
+paddlex --paddle2onnx \
+    --paddle_model_dir ./PP-OCRv6_small_det_infer \
+    --onnx_model_dir ./models/det \
+    --opset_version 11
+
+# 2. ONNX → OM
+atc --model=./v6_small_det.onnx \
+    --framework=5 \
+    --output=./om/v6_small_det \
+    --input_shape="x:1,3,960,960" \
+    --soc_version=Ascend310 \
+    --precision_mode=allow_fp32_to_fp16
+```
+
+> **注意：** `--precision_mode=allow_fp32_to_fp16` 参数很重要，不加在某些设备上会导致检测不出文本框或误差极大。
+>
+> 转出的模型是静态输入尺寸，最长边固定 960。静态模型速度更快，建议根据业务场景定死此值，常见：960、1600 等。
+
+</details>
+
+<details>
+<summary><b>3. 文字识别模型</b></summary>
+
+原始模型：PaddleOCR PP-OCRv6_small_rec
+
+```bash
+# 1. PaddleOCR → ONNX
+paddlex --paddle2onnx \
+    --paddle_model_dir ./PP-OCRv6_small_rec_infer \
+    --onnx_model_dir ./models/rec \
+    --opset_version 11
+
+# 2. ONNX → OM
+atc --model=./v6_small_rec.onnx \
+    --framework=5 \
+    --output=./om/v6_small_rec \
+    --input_shape="x:1,3,48,960" \
+    --soc_version=Ascend310 \
+    --precision_mode=allow_fp32_to_fp16
+```
+
+</details>
+
+<details>
+<summary><b>4. 版面分析模型</b></summary>
+
+原始模型：PaddleOCR PP-DocLayoutV3
+
+```bash
+atc --model=PP-DocLayoutV3.onnx \
+    --framework=5 \
+    --output=PP-DocLayoutV3 \
+    --input_format=ND \
+    --input_shape="im_shape:1,2;image:1,3,800,800;scale_factor:1,2" \
+    --soc_version=Ascend310 \
+    --input_format=ND \
+    --precision_mode=allow_fp32_to_fp16
+```
+
+</details>
+
+<details>
+<summary><b>5. 表格识别模型</b></summary>
+
+原始模型：YOLO11 训练的表格/单元格检测模型（table.onnx）
+
+```bash
+atc --model=table.onnx \
+    --framework=5 \
+    --output=table \
+    --input_format=NCHW \
+    --input_shape="images:1,3,640,640" \
+    --soc_version=Ascend310 \
+    --precision_mode=allow_fp32_to_fp16
+```
+
+> 模型输出格式：`[1, 6, 8400]`，其中 6 = `[cx, cy, w, h, table_score, cell_score]`。
+> 训练时使用 2 个类别：`table`（表格区域）和 `cell`（单元格）。
+
+</details>
 
 ## 加密模型
 

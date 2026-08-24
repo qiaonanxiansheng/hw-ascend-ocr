@@ -43,7 +43,7 @@ engine = AscendOCR(
     device_id=0,
 )
 
-results, angle = engine.ocr("test.png")
+results, angle = engine.ocr("table.png")
 for r in results:
     print(r.text, r.score)
 
@@ -64,7 +64,7 @@ cfg = OCRConfig(
 )
 engine = AscendOCR(cfg)
 
-regions, region_ocr_results, clusters, angle = engine.layout_ocr("test.png")
+regions, region_ocr_results, clusters, angle = engine.layout_ocr("table.png")
 
 for region, ocr_lines in region_ocr_results:
     print(f"[{region.class_name}] {region.bbox}")
@@ -205,7 +205,7 @@ uvicorn api.app:app --host 0.0.0.0 --port 13502
 ```bash
 curl -X POST \
   -F "file_id=test1" \
-  -F "file=@test.jpg" \
+  -F "file=@table.png" \
   -F "use_rotate=true" \
   http://localhost:13502/api/ocr
 ```
@@ -251,8 +251,8 @@ curl -X POST \
 ```bash
 curl -X POST \
   -F "file_id=test1" \
-  -F "file=@test.jpg" \
-  -F "score_threshold=0.6" \
+  -F "file=@table.png" \
+  -F "score_threshold=0.5" \
   http://localhost:13502/api/layout-ocr
 ```
 
@@ -515,19 +515,19 @@ docker run -d --restart unless-stopped \
 # 全文识别
 curl -X POST \
   -F "file_id=test1" \
-  -F "file=@docs/test.tif" \
+  -F "file=@docs/table.png" \
   http://localhost:13502/api/ocr
 
 # 版面分析（表格区域自动生成 HTML）
 curl -X POST \
   -F "file_id=test1" \
-  -F "file=@docs/test.tif" \
+  -F "file=@docs/table.png" \
   http://localhost:13502/api/layout-ocr
 
 # 表格结构识别（独立接口，无需版面模型）
 curl -X POST \
   -F "file_id=test1" \
-  -F "file=@docs/test.tif" \
+  -F "file=@docs/table.png" \
   http://localhost:13502/api/table-ocr
 ```
 

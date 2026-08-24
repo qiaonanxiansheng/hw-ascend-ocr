@@ -27,9 +27,9 @@ env/
 Thumbs.db
 
 # Model files (large binaries)
-models/**/*.om
-models/**/*.om.enc
-models/**/*.onnx
+#models/**/*.om
+#models/**/*.om.enc
+#models/**/*.onnx
 
 # Test outputs
 ocr_result.jpg

@@ -673,6 +673,47 @@ atc --model=table.onnx \
 
 </details>
 
+### 批量转换脚本（推荐）
+
+项目提供了 `convert_onnx_to_om.sh` 脚本，可以一键批量转换所有模型。
+
+**使用方法：**
+
+```bash
+# 转换默认芯片（310 和 310P3）
+./convert_onnx_to_om.sh
+
+# 转换指定芯片
+./convert_onnx_to_om.sh 310 910B3
+
+# 转换单个芯片
+./convert_onnx_to_om.sh 310P
+```
+
+**前置条件：**
+1. 将 ONNX 模型文件放到 `models/onnx/` 目录下：
+   - `rotate.onnx` - 大角度分类模型
+   - `v6_small_det.onnx` - 文字检测模型
+   - `v6_small_rec.onnx` - 文字识别模型
+   - `PP-DocLayoutV3.onnx` - 版面分析模型（可选）
+   - `table.onnx` - 表格识别模型（可选）
+2. 确保已安装 Ascend CANN Toolkit（`atc` 命令可用）
+
+**输出目录结构：**
+```
+models/
+├── onnx/              ← ONNX 源文件
+│   ├── rotate.onnx
+│   ├── v6_small_det.onnx
+│   └── ...
+├── 310/               ← 转换后的 OM 模型
+│   ├── det.om
+│   ├── rec.om
+│   └── ...
+└── 310P3/
+    └── ...
+```
+
 ### 转换完成后
 
 将所有 `.om` 文件放到对应的芯片目录下：

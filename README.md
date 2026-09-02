@@ -675,29 +675,63 @@ atc --model=table.onnx \
 
 ### 批量转换脚本（推荐）
 
-项目提供了 `convert_onnx_to_om.sh` 脚本，可以一键批量转换所有模型。
+项目提供了 `convert_encrypt_models.py` 脚本，可以一键批量转换所有模型（输出明文 OM，不做加密）。
+
+**转换参数说明：**
+
+所有模型统一使用以下 atc 参数，**保持原始精度**，不做 FP32→FP16 降精度：
+
+- `--precision_mode=must_keep_origin_dtype` — 保持原始数据类型，不做 FP32→FP16 降精度
+- `--op_select_implmode=high_precision` — 算子选择高精度实现
+- `--plugin=ByPass` — 绕过插件
+
+> **为什么要加这两个参数？**
+> ONNX 转 OM 时，atc 默认会将 FP32 算子转换为 FP16 以提升推理速度，并可能选择非高精度的算子实现，这会导致模型精度丢失（输出与原始 ONNX 推理结果有偏差）。加上 `--precision_mode=must_keep_origin_dtype` 和 `--op_select_implmode=high_precision` 后，OM 模型保持与 ONNX 一致的数据类型和算子精度，保证推理结果不降精度。
 
 **使用方法：**
 
 ```bash
-# 转换默认芯片（310 和 310P3）
-./convert_onnx_to_om.sh
+# 1. 先加载 CANN 环境（atc 命令来自 CANN Toolkit）
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
 
-# 转换指定芯片
-./convert_onnx_to_om.sh 310 910B3
+# 2. 转换 config.yaml 中 chip 字段指定的芯片（默认行为）
+python convert_encrypt_models.py
+
+# 3. 也可以通过命令行参数指定一个或多个芯片（会覆盖 config.yaml 的 chip）
+python convert_encrypt_models.py 310 910B3
 
 # 转换单个芯片
-./convert_onnx_to_om.sh 310P
+python convert_encrypt_models.py 310P
 ```
 
+> 芯片型号不需要带 `Ascend` 前缀，脚本会自动拼接，如 `310` → `Ascend310`。
+
+**脚本行为：**
+
+- 从 `models/onnx/` 读取 ONNX 源文件，输出 OM 到 `models/{chip}/` 目录（自动创建）
+- 每个模型的 `--input_shape` / `--input_format` 已内置在脚本中，与上面各模型的手动转换命令一致
+- 某个 ONNX 文件不存在时会**跳过**该模型并继续转换其余模型
+- 转换结束后输出汇总（成功/失败/跳过数量），有失败时退出码为 1
+
+**内置模型列表：**
+
+| ONNX 文件 | 输出 | input_shape | input_format |
+|-----------|------|-------------|--------------|
+| `rotate.onnx` | `rotate.om` | `images:1,3,512,512` | - |
+| `v6_small_det.onnx` | `det.om` | `x:1,3,960,672` | - |
+| `v6_small_rec.onnx` | `rec.om` | `x:1,3,48,960` | - |
+| `PP-DocLayoutV3.onnx` | `PP-DocLayoutV3.om` | `im_shape:1,2;image:1,3,800,800;scale_factor:1,2` | `ND` |
+| `table.onnx` | `table.om` | `images:1,3,640,640` | `NCHW` |
+
 **前置条件：**
-1. 将 ONNX 模型文件放到 `models/onnx/` 目录下：
+1. 将 ONNX 模型文件放到 `models/onnx/` 目录下（文件名必须与上表一致）：
    - `rotate.onnx` - 大角度分类模型
    - `v6_small_det.onnx` - 文字检测模型
    - `v6_small_rec.onnx` - 文字识别模型
    - `PP-DocLayoutV3.onnx` - 版面分析模型（可选）
    - `table.onnx` - 表格识别模型（可选）
-2. 确保已安装 Ascend CANN Toolkit（`atc` 命令可用）
+2. 确保已安装 Ascend CANN Toolkit 并已 `source set_env.sh`（`atc` 命令可用）
+3. 已安装 Python 依赖 `pyyaml`（用于读取 `config.yaml`）
 
 **输出目录结构：**
 ```
@@ -706,7 +740,7 @@ models/
 │   ├── rotate.onnx
 │   ├── v6_small_det.onnx
 │   └── ...
-├── 310/               ← 转换后的 OM 模型
+├── 310/               ← 转换后的 OM 模型（目录名 = config.yaml 的 chip）
 │   ├── det.om
 │   ├── rec.om
 │   └── ...
@@ -716,7 +750,7 @@ models/
 
 ### 转换完成后
 
-将所有 `.om` 文件放到对应的芯片目录下：
+使用批量转换脚本时 OM 文件已直接输出到 `models/{chip}/`，无需手动移动。如果是手动执行 atc 转换的，需要将所有 `.om` 文件放到对应的芯片目录下：
 
 ```bash
 mkdir -p models/310

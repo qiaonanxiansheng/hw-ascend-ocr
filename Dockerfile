@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:8.1.rc1-310p-ubuntu22.04-py3.11
+ARG BASE_IMAGE=swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.0.0-910b-ubuntu22.04-py3.11-devel
 FROM ${BASE_IMAGE}
 
 # pip 使用清华源
@@ -12,9 +12,6 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt && rm /tmp/requirements.
 WORKDIR /workspace
 COPY . /workspace
 RUN chmod +x /workspace/entrypoint.sh
-
-# Load CANN environment in interactive shells
-RUN echo "source /usr/local/Ascend/ascend-toolkit/set_env.sh" >> /root/.bashrc
 
 # Expose OCR service port
 EXPOSE 13502

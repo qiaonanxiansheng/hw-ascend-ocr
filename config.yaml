@@ -4,7 +4,7 @@
 # ======================== 模型路径 ========================
 # 模型按芯片类型存放在 models/ 目录下
 # 目录结构: models/{芯片型号}/{det,rec,rotate}.om
-chip: "310"
+chip: "910B4-1"
 
 # 模型路径自动根据 chip 拼接: models/{chip}/{det,rec,rotate,layout}.om
 # 如需覆盖特定模型，取消注释并修改:
@@ -61,13 +61,13 @@ det:
   # ---- DBNet 后处理 ----
 
   # 概率图二值化阈值
-  thresh: 0.3
+  thresh: 0.35
 
   # 候选框内最小平均概率，低于此值的框会被过滤
-  box_thresh: 0.6
+  box_thresh: 0.25
 
   # 多边形扩展比例。1.0 = 不扩展，1.5~2.0 = 标准 DB unclip
-  unclip_ratio: 1.6
+  unclip_ratio: 1.75
 
   # 框面积的最小/最大值（原图像素），超出范围的框会被过滤
   min_box_area: 10.0

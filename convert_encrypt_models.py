@@ -63,7 +63,6 @@ def convert_model(onnx_file, output_name, input_shape, input_format,
         f"--soc_version={soc_version}",
         "--precision_mode=must_keep_origin_dtype",
         "--op_select_implmode=high_precision",
-        "--plugin=ByPass",
     ]
     if input_format:
         cmd.append(f"--input_format={input_format}")
@@ -78,6 +77,7 @@ def convert_model(onnx_file, output_name, input_shape, input_format,
 
 def convert_chip(chip, stats):
     """转换单个芯片的所有模型"""
+    # chip 即目录名, 也直接拼成 atc 的 soc_version, 如 910B4-1 -> Ascend910B4-1
     soc_version = f"Ascend{chip}"
     output_dir = OUTPUT_ROOT / chip
 

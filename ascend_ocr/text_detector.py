@@ -40,6 +40,37 @@ class TextDetector:
                     list(shape), shape[3], shape[2],
                 )
 
+    def _pad_to_model_aspect(self, img: np.ndarray) -> Tuple[np.ndarray, int, int]:
+        """
+        静态 OM 检测模型（固定输入尺寸）会把任意图片各向异性拉伸到模型输入大小。
+        宽高比与模型输入相差较大的图（如身份证等小卡片）文字几何失真，导致漏检。
+        这里先按原图中心补白边，把宽高比补到与模型输入一致，使后续强制拉伸近似等比缩放。
+
+        Returns:
+            (补边后的图像, pad_x, pad_y)，pad_x/pad_y 为左/上补边像素数，用于还原坐标
+        """
+        det_h, det_w = self.cfg.fixed_input_size
+        h, w = img.shape[:2]
+        target_ratio = det_h / det_w
+        cur_ratio = h / w
+        # 宽高比已接近模型输入比例，无需补边，行为与原逻辑完全一致。
+        # 阈值取 5%：只有偏差大的图（如接近方形或窄长条的小图）才补边
+        if abs(cur_ratio - target_ratio) / target_ratio < 0.05:
+            return img, 0, 0
+        if cur_ratio < target_ratio:
+            # 偏宽：上下补白边
+            new_h = int(round(w * target_ratio))
+            pad_y = (new_h - h) // 2
+            padded = cv2.copyMakeBorder(img, pad_y, new_h - h - pad_y, 0, 0,
+                                        cv2.BORDER_CONSTANT, value=(255, 255, 255))
+            return padded, 0, pad_y
+        # 偏高：左右补白边
+        new_w = int(round(h / target_ratio))
+        pad_x = (new_w - w) // 2
+        padded = cv2.copyMakeBorder(img, 0, 0, pad_x, new_w - w - pad_x,
+                                    cv2.BORDER_CONSTANT, value=(255, 255, 255))
+        return padded, pad_x, 0
+
     def detect(self, img: np.ndarray) -> List[np.ndarray]:
         """
         Detect text boxes in the image.
@@ -51,6 +82,15 @@ class TextDetector:
             List of 4-point polygons (shape (4, 2)) in original image coordinates,
             ordered from top to bottom.
         """
+        orig_h, orig_w = img.shape[:2]
+        pad_x = pad_y = 0
+        if self.cfg.fixed_input_size is not None:
+            img, pad_x, pad_y = self._pad_to_model_aspect(img)
+            if pad_x or pad_y:
+                logger.debug(
+                    "检测前补边: 原图 %dx%d, pad_x=%d, pad_y=%d",
+                    orig_w, orig_h, pad_x, pad_y,
+                )
         tensor, scale, _ = preprocess_for_detection(img, self.cfg)
         outputs = self.model.infer([tensor])
         pred = outputs[0]
@@ -61,6 +101,11 @@ class TextDetector:
             scale=scale,
             cfg=self.cfg,
         )
+        if pad_x or pad_y:
+            # 把补边坐标系下的框平移回原图坐标系，并裁剪到原图范围内
+            for box in boxes:
+                box[:, 0] = np.clip(box[:, 0] - pad_x, 0, orig_w)
+                box[:, 1] = np.clip(box[:, 1] - pad_y, 0, orig_h)
         logger.debug("Detected %d text boxes", len(boxes))
         return boxes
 

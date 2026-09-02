@@ -29,8 +29,8 @@ def _unclip(points: np.ndarray, unclip_ratio: float, use_pyclipper: bool = True)
     if length < 1e-6:
         return points.reshape(-1, 1, 2)
 
-    # DBNet unclip distance formula.
-    distance = area * (unclip_ratio ** 2 - 1) / length
+    # DBNet unclip distance formula（与 PaddleOCR 标准一致: area * ratio / perimeter）
+    distance = area * unclip_ratio / length
 
     if use_pyclipper:
         try:

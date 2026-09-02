@@ -57,13 +57,13 @@ class DetConfig:
 
     # ------------------------- Post-process (DBNet) -------------------------
     # Binarization threshold for the probability map.
-    thresh: float = 0.3
+    thresh: float = 0.35
 
     # Minimum mean probability inside a candidate box to keep it.
-    box_thresh: float = 0.6
+    box_thresh: float = 0.25
 
     # Polygon expansion ratio. 1.0 = no expansion, 1.5~2.0 = standard DB unclip.
-    unclip_ratio: float = 1.6
+    unclip_ratio: float = 1.75
 
     # Minimum / maximum box area (in original image pixels) to keep.
     min_box_area: float = 10.0

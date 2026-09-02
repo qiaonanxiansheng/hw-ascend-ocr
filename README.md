@@ -159,8 +159,8 @@ cfg = OCRConfig(
     det=DetConfig(
         limit_side_len=960,
         resize_mode="pad",
-        thresh=0.3,
-        box_thresh=0.6,
+        thresh=0.35,
+        box_thresh=0.25,
     ),
     rec=RecConfig(
         resize_mode="fixed_height_pad",
@@ -495,6 +495,8 @@ models/
 docker run -d --restart unless-stopped \
     --name ascend-ocr \
     -p 13502:13502 \
+     --ipc=host \
+    --privileged=true \
     --device=/dev/davinci4:/dev/davinci0 \
     --device=/dev/davinci_manager \
     --device=/dev/devmm_svm \
@@ -519,11 +521,12 @@ docker run -d --restart unless-stopped \
 ```bash
 docker run -d --restart unless-stopped \
     --name ascend-ocr \
-    -p 13502:13502 \
-    $(for d in /dev/davinci[0-9]*; do echo "--device=$d"; done) \
+    --ipc=host \
+    --privileged=true \
     --device=/dev/davinci_manager \
     --device=/dev/devmm_svm \
     --device=/dev/hisi_hdc \
+    -p 13502:13502 \
     -v /usr/local/Ascend/driver:/usr/local/Ascend/driver:ro \
     -v /usr/local/Ascend/driver/lib64:/usr/local/Ascend/driver/lib64:ro \
     -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info:ro \
@@ -531,8 +534,7 @@ docker run -d --restart unless-stopped \
     -v /etc/ascend_install.info:/etc/ascend_install.info:ro \
     -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi:ro \
     -v /usr/local/dcmi:/usr/local/dcmi:ro \
-    -v /opt/ascend-ocr/config.yaml:/workspace/config.yaml \
-    -v /opt/ascend-ocr/models:/workspace/models \
+    -v /opt/docimax/ascend-ocr/config.yaml:/workspace/config.yaml \
     -e CONVERT_MODELS=auto \
     -e LD_LIBRARY_PATH=/usr/local/Ascend/driver/lib64:/usr/local/Ascend/driver/lib64/driver:/usr/local/Ascend/driver/lib64/common \
     --shm-size=8g \
@@ -739,7 +741,6 @@ atc --model=table.onnx \
 
 - `--precision_mode=must_keep_origin_dtype` — 保持原始数据类型，不做 FP32→FP16 降精度
 - `--op_select_implmode=high_precision` — 算子选择高精度实现
-- `--plugin=ByPass` — 绕过插件
 
 > **为什么要加这两个参数？**
 > ONNX 转 OM 时，atc 默认会将 FP32 算子转换为 FP16 以提升推理速度，并可能选择非高精度的算子实现，这会导致模型精度丢失（输出与原始 ONNX 推理结果有偏差）。加上 `--precision_mode=must_keep_origin_dtype` 和 `--op_select_implmode=high_precision` 后，OM 模型保持与 ONNX 一致的数据类型和算子精度，保证推理结果不降精度。

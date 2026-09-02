@@ -282,6 +282,20 @@ class AscendOCR:
         """
         t_det_start = time.perf_counter()
 
+        # 小图优化：高度 < 30 像素的单行文本图（如条形码下方编号、小字段截图），
+        # 检测模型几乎不可能检出有效框，直接跳过检测，把整图当一行送识别。
+        h, w = img.shape[:2]
+        if h < 30:
+            t_rec_start = time.perf_counter()
+            rec_results = self.recognizer.recognize_batch([img])
+            t_rec = time.perf_counter() - t_rec_start
+            text, score = rec_results[0]
+            box = np.array(
+                [[0, 0], [w, 0], [w, h], [0, h]], dtype=np.float32
+            )
+            logger.debug("[小图模式] 高度 %d < 30, 跳过检测直接识别", h)
+            return [OCRResult(box=box, text=text, score=score)], t_rec * 1000
+
         # 1. 文字检测
         boxes = self.detector.detect(img)
         if not boxes:

@@ -11,6 +11,7 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt && rm /tmp/requirements.
 # Copy project
 WORKDIR /workspace
 COPY . /workspace
+RUN chmod +x /workspace/entrypoint.sh
 
 # Load CANN environment in interactive shells
 RUN echo "source /usr/local/Ascend/ascend-toolkit/set_env.sh" >> /root/.bashrc
@@ -18,5 +19,9 @@ RUN echo "source /usr/local/Ascend/ascend-toolkit/set_env.sh" >> /root/.bashrc
 # Expose OCR service port
 EXPOSE 13502
 
+# Entrypoint: 按需转换模型后启动服务
+# 通过 -e CONVERT_MODELS=auto|always|never 控制是否转换模型(默认 auto: 缺失才转换)
+ENTRYPOINT ["/bin/bash", "/workspace/entrypoint.sh"]
+
 # Default command: start OCR API service
-CMD ["/bin/bash", "-c", "source /usr/local/Ascend/ascend-toolkit/set_env.sh && uvicorn api.app:app --host 0.0.0.0 --port 13502"]
+CMD []

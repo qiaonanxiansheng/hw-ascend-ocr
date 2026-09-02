@@ -399,27 +399,9 @@ curl -X POST \
 
 ## Docker 部署
 
-### 第一步：准备模型文件
+部署流程：**修改配置 → 构建镜像 → 容器内转换模型 → 启动服务**。
 
-模型按芯片类型存放在 `models/` 目录下，程序会根据 `config.yaml` 中的 `chip` 字段自动加载对应目录的模型：
-
-```
-models/
-├── 310/                  ← chip: "310" 时加载这个目录
-│   ├── det.om
-│   ├── rec.om
-│   ├── rotate.om
-│   ├── PP-DocLayoutV3.om
-│   └── table.om
-├── 310P/                 ← chip: "310P" 时加载这个目录
-│   └── ...
-└── 910B3/                ← chip: "910B3" 时加载这个目录
-    └── ...
-```
-
-将你转换好的 OM 模型放到对应的芯片目录下即可。
-
-### 第二步：修改配置文件
+### 第一步：修改配置文件
 
 编辑 `config.yaml`，修改 `chip` 字段为你的芯片型号：
 
@@ -437,7 +419,9 @@ rec_model: "models/310/rec.om"
 table_model: "models/310/table.om"
 ```
 
-### 第三步：构建镜像
+> `chip` 字段同时决定：转换脚本生成模型到 `models/{chip}/` 目录、服务启动时从 `models/{chip}/` 加载模型，两处保持一致。
+
+### 第二步：构建镜像
 
 **1. 下载 Ascend CANN 基础镜像**
 
@@ -462,9 +446,50 @@ docker build \
 
 > 将基础镜像地址替换为你从 Ascend 官网下载的实际镜像，标签中的 `310p` 改成你的芯片型号。
 
+### 第三步：转换模型（容器内自动完成）
+
+镜像内置了 `entrypoint.sh` 入口脚本，容器启动时会自动检查模型：
+
+1. 读取 `config.yaml` 的 `chip` 字段，检查 `models/{chip}/` 目录
+2. 如果目录下没有 `.om` 文件，自动执行 `convert_encrypt_models.py`，把 `models/onnx/*.onnx` 转换为 OM 并输出到 `models/{chip}/`（由于 `models/` 是挂载目录，转换结果保留在宿主机上，重建容器不会丢失）
+3. 模型就绪后启动 OCR 服务
+
+通过环境变量 `CONVERT_MODELS` 控制转换行为：
+
+| 取值 | 行为 |
+|------|------|
+| `auto`（默认） | `models/{chip}/` 下缺少 `.om` 时才转换 |
+| `always` | 每次启动都强制重新转换 |
+| `never` | 不转换，直接启动服务（需自行提供 OM 模型） |
+
+**准备工作：** 如果没有现成的 OM 模型，先把 ONNX 模型文件放到宿主机的 `models/onnx/` 目录（文件名要求见下方「模型转换」章节），启动容器时会自动完成转换。
+
+模型目录结构：
+
+```
+models/
+├── onnx/                 ← ONNX 源文件（转换前放入）
+│   ├── rotate.onnx
+│   ├── v6_small_det.onnx
+│   └── ...
+├── 310/                  ← chip: "310" 时转换输出到这个目录，服务也加载这个目录
+│   ├── det.om
+│   ├── rec.om
+│   ├── rotate.om
+│   ├── PP-DocLayoutV3.om
+│   └── table.om
+└── 910B3/
+    └── ...
+```
+
+> 转换是离线编译，不需要 NPU 设备参与。也可以随时手动进容器转换：
+> `docker exec -it ascend-ocr python convert_encrypt_models.py 910B3`
+
 ### 第四步：启动容器
 
-以物理机 NPU 4 在容器中映射为 NPU 0 为例：
+> **注意：** NPU 设备必须显式挂载，**不写 `--device` 不是全部使用，而是容器里一块 NPU 都没有**，服务会因找不到设备启动失败。
+
+**示例 1：只使用第 4 号 NPU**（物理机 NPU 4 在容器中映射为 NPU 0）：
 
 ```bash
 docker run -d --restart unless-stopped \
@@ -483,10 +508,40 @@ docker run -d --restart unless-stopped \
     -v /usr/local/dcmi:/usr/local/dcmi:ro \
     -v /opt/ascend-ocr/config.yaml:/workspace/config.yaml \
     -v /opt/ascend-ocr/models:/workspace/models \
+    -e CONVERT_MODELS=auto \
     -e LD_LIBRARY_PATH=/usr/local/Ascend/driver/lib64:/usr/local/Ascend/driver/lib64/driver:/usr/local/Ascend/driver/lib64/common \
     --shm-size=8g \
     ascend-ocr:310p
 ```
+
+**示例 2：使用全部 NPU**（把宿主机所有 davinci 设备都挂载进去）：
+
+```bash
+docker run -d --restart unless-stopped \
+    --name ascend-ocr \
+    -p 13502:13502 \
+    $(for d in /dev/davinci[0-9]*; do echo "--device=$d"; done) \
+    --device=/dev/davinci_manager \
+    --device=/dev/devmm_svm \
+    --device=/dev/hisi_hdc \
+    -v /usr/local/Ascend/driver:/usr/local/Ascend/driver:ro \
+    -v /usr/local/Ascend/driver/lib64:/usr/local/Ascend/driver/lib64:ro \
+    -v /usr/local/Ascend/driver/version.info:/usr/local/Ascend/driver/version.info:ro \
+    -v /usr/local/Ascend/add-ons:/usr/local/Ascend/add-ons:ro \
+    -v /etc/ascend_install.info:/etc/ascend_install.info:ro \
+    -v /usr/local/bin/npu-smi:/usr/local/bin/npu-smi:ro \
+    -v /usr/local/dcmi:/usr/local/dcmi:ro \
+    -v /opt/ascend-ocr/config.yaml:/workspace/config.yaml \
+    -v /opt/ascend-ocr/models:/workspace/models \
+    -e CONVERT_MODELS=auto \
+    -e LD_LIBRARY_PATH=/usr/local/Ascend/driver/lib64:/usr/local/Ascend/driver/lib64/driver:/usr/local/Ascend/driver/lib64/common \
+    --shm-size=8g \
+    ascend-ocr:310p
+```
+
+> 挂载全部 NPU 时，实际使用哪一块由 `config.yaml` 的 `device_id` 决定（容器内编号从 0 开始）。
+>
+> 如果宿主机安装了 Ascend Docker Runtime，也可以不用手动挂载设备，直接加 `-e ASCEND_VISIBLE_DEVICES=all`（全部）或 `-e ASCEND_VISIBLE_DEVICES=4`（指定第 4 号）。
 
 **参数说明：**
 
@@ -502,7 +557,8 @@ docker run -d --restart unless-stopped \
 | `-v .../npu-smi:ro` | 挂载 npu-smi 工具（只读） |
 | `-v .../dcmi:ro` | 挂载 DCMI（只读） |
 | `-v .../config.yaml` | 挂载配置文件，修改芯片型号后重启即生效 |
-| `-v .../models` | 挂载模型目录，更换模型不用重建镜像 |
+| `-v .../models` | 挂载模型目录，转换结果保留在宿主机，更换模型不用重建镜像 |
+| `-e CONVERT_MODELS=auto` | 模型转换策略：`auto` 缺失才转换（默认）/ `always` 强制转换 / `never` 不转换 |
 | `--shm-size=8g` | 共享内存，OCR 推理需要较大内存 |
 
 > **NPU 设备映射：** `--device=/dev/davinci4:/dev/davinci0` 表示物理机的第 4 号 NPU 在容器里是第 0 个。如果你只有一块 NPU 且是第 0 号，写 `--device=/dev/davinci0` 即可。

@@ -155,6 +155,9 @@ rotate:
   # 类别索引 -> 旋转角度（度，逆时针），顺序必须与模型输出一致
   label_list: [0, 180, 270, 90]
 
+  # 最小置信度：分类置信度低于此值时不旋转，按 0 度处理
+  rotate_min_confidence: 0.9
+
   # 归一化方式: "imagenet" | "ppocr" | "none" | "custom"
   normalize_mode: "ppocr"
 

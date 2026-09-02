@@ -58,6 +58,14 @@ class AngleClassifier:
             (rotated_image, angle, confidence)
         """
         angle, confidence = self.classify(img)
+        # 置信度不足时不相信分类结果，按 0 度处理
+        if confidence < self.cfg.rotate_min_confidence:
+            if angle != 0:
+                logger.info(
+                    "角度分类置信度 %.3f < %.2f, 按 0 度处理",
+                    confidence, self.cfg.rotate_min_confidence,
+                )
+            angle = 0
         if angle != 0:
             img = rotate_image(img, angle)
         return img, angle, confidence
